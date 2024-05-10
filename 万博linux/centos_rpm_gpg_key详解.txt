@@ -1,0 +1,47 @@
+一、什么是GPG：
+GPG在Linux上的应用主要是实现官方发布的包的签名机制。
+GPG分为公钥及私钥。
+公钥：顾名思意，即可共享的密钥，主要用于验证私钥加密的数据及签名要发送给私钥方的数据。
+私钥：由本地保留的密钥，用于签名本地数据及验证用公钥签名的数据。             
+
+二、实现原理(以Red Hat签名为例)：
+（1）RH在发布其官方的RPM包时(如本地RHEL光盘及FTP空间包)，会提供一个GPG密钥文件，即所谓的公钥。
+（2）用户下载安装这个RPM包时，引入RH官方的这个RPM GPG公钥，用来验证RPM包是不是RH官方签名的。
+导入GPG-KEY:
+	查找相应的GPG密钥：
+	https://www.redhat.com/security/team/key/或/etc/pki/rpm-gpg
+	导入到RPM:
+	rpm --import /etc/pki/rpm-gpg/RPM-GPG-KEY
+
+三、签名及加密概念
+签名类似于校验码，用于识别软件包是不是被修改过，最常用的的就是我们的GPG及MD5签名，
+原方使用一定的字符（MD5)或密码(GPG私钥）与软件进行相应的运算并得到一个定长的密钥。
+加密是用一定的密钥对原数据进行修改，即使程序在传输中被截获，只要它不能解开密码，
+就不能对程序进行修改，除非破坏掉文件，那样我们就知道软件被修改过了。
+
+四、RPM验证方法
+1.验证安装的整个软件包的文件
+rpm -V crontabs-1.10-8
+
+2.验证软件包中的单个文件
+rpm -Vf /etc/crontab
+注：如果文件没有被修改过，则不输出任何信息。
+
+3.验证整个软件包是否被修改过
+rpm -Vp AdobeReader_chs-7.0.9-1.i386.rpm
+验证结果：
+.......T   /usr/local/Adobe/Acrobat7.0/Reader/GlobalPrefs/reader_prefs
+S.5....T   /usr/local/Adobe/Acrobat7.0/bin/acroread
+
+4.验证签名
+rpm -K AdobeReader_chs-7.0.9-1.i386.rpm
+AdobeReader_chs-7.0.9-1.i386.rpm: sha1 md5 OK
+验证结果含意：
+S ：file Size differs
+M ：Mode differs (includes permissions and file type)
+5 ：MD5 sum differs
+D ：Device major/minor number mis-match
+L ：readLink(2) path mis-match
+U ：User ownership differs
+G ：Group ownership differs
+T ：mTime differs

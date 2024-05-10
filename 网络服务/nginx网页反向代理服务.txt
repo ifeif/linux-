@@ -1,0 +1,287 @@
+什么是代理：假设有两台主机，一台服务器，其中一台主机代理(代替)另一台主机去访问服务器。
+正向代理(forward proxy)：代理对象是客户端，客户端转发给代理客户端，由代理客户端去真正访问服务器，隐藏了客户端的身份(IP)。
+客户端<==转发==>代理客户端的服务器<----------->服务器
+正向代理可以在win10或浏览器的设置里开启，需要指定代理服务器的地址和端口，还可以通过第三方软件开启代理。
+反向代理(reverse proxy)：代理对象是服务端，客户端真正访问的是代理服务器，隐藏了服务器的真实身份(IP)。
+客户端<----------->代理服务器的服务器<==转发==>服务器
+反向代理还应用于负载均衡(Load Balance)，代理服务器会将大量的请求分摊给多台提供相同服务的服务器或集群。
+负载均衡的策略跟nginx使用的负载均衡算法有关，默认使用轮询算法，nginx还提供各种参数给负载均衡调优。
+轮询(轮流查询)：每个请求按时间顺序逐一分配到不同的后端服务器
+
+nginx是一款轻量级的web/反向代理服务器软件，提供高并发(高性能)的http服务。
+反向代理还会将客户端请求的源web服务器上的内容保存到本地，以便日后再收到同样的信息请求时，
+将本地缓存里的内容直接发给用户，以减少源web服务器的压力，提高响应速度。因此nginx还具有缓存功能。
+yum install -y epel-release	#安装扩展源
+yum install -y nginx		#安装nginx
+
+vim /etc/nginx/nginx.conf	#修改nginx默认配置文件
+http {
+  include mime.types; 		#文件扩展名与文件类型映射表
+  default_type application/octet-stream; 	#默认文件类型
+  autoindex on; 			#开启目录列表访问，合适下载服务器，默认关闭
+  sendfile on; 			#开启高效文件传输模式
+  tcp_nopush on; 			#防止网络阻塞
+  tcp_nodelay on; 			#防止网络阻塞
+  keepalive_timeout 120; 		#客户端连接保持存活的最大时间，单位是秒
+  gzip on; 				#开启gzip压缩输出
+  upstream 节点池名字 {		#均衡负载配置块
+    server 127.0.0.1:8090 weight=1 max_fails=3 fail_timeout=10s;	#被http反向代理的服务器地址或域名和端口号，可添加多台
+    server 127.0.0.1:8080 weight=2 max_fails=3 fail_timeout=10s;	
+    #weight：代表权重，默认为 1，权重值越大被分配的客户端越多
+    #max_fails：允许请求最大失败次数，用于探测后端节点状态，默认为1
+    #fail_timeout：在经历了max_fails次失败后，暂停该后端节点的超时时间，等待下次探测，默认为10s
+    #超时：发起请求后，等待响应发回的时间超过某段指定的时间后就称为超时，超时之后通常情况下是断开当前连接或者重连
+  }
+  server {				#nginx网页服务配置块
+    listen 80;			#监听本机所有ipv4地址的80端口，如果有多张网卡可以在端口前指定地址，如果省略了端口则默认为80
+    listen [::]:80;			#监听本机所有ipv6地址的80端口
+    server_name 域名或IP地址;		#本机域名，多个域名用空格分开，可填写ip，当请求提交到nginx时，会先匹配ip，如果ip(listen字段)没有找到对应的ip，再通过域名(server_name字段)进行匹配
+    client_max_body_size 1024m;	#客户端可通过http传输文件的大小，默认为1m
+    keepalive_timeout 60;		#客户端连接保持存活的最大时间，默认为75秒
+    charset utf-8;			#字符集
+    location / {			#网站虚拟路径(虚拟主机)，可添加多个，/代表根虚拟目录。当有多个location配置块时，优先匹配最符合条件的。
+      proxy_pass http://地址:端口或节点池名字;	#配置http反向代理的地址(域名)和端口或者负载均衡池
+    }
+    location /www/ {			#当访问虚拟目录www时，进入根目录(root)下对应的www目录
+      root 根目录绝对路径;		#网站的根目录，该目录必须开放权限
+      index 文件名;			#网站默认页面，默认为index.html
+    }
+    location /chen/ {			#当访问虚拟目录chen时，直接进入根目录(alias)
+      alias 根目录绝对路径;
+    }
+  }
+}
+#配置块上下文：用花括号括起来的内容称为该配置块的上下文，类似函数的作用域。如果一个配置块包含另一个配置块，内部没有指定的字段将使用外部已指定的相同字段。
+nginx -t	#检查nginx配置文件语法
+nginx	#启动nginx服务
+或者
+systemctl enable nginx --now	#永久开启nginx服务
+nginx -s stop	#关闭nginx服务
+nginx -s reload	#重新加载配置文件
+
+location 正则+路径  实现匹配分发
+语法格式：
+	location [ = | ~ | ~* | ^~ ] uri { }
+(1)=：用于不含正则表达式的uri前，要求请求字符串与uri严格匹配，如果匹配成功，就停止继续向下搜索并立即处理该请求。
+(2)~：用于表示uri包含正则表达式，并且区分大小写。
+(3)~*：用于表示uri包含正则表达式，并且不区分大小写。
+(4)^~：用于不包含正则表达式的uri前，要求nginx服务器找到标识uri和请求字符串匹配度最高的location后，立即使用此location处理请求，而不再使用location块中的正则uri与请求字符串做匹配。
+优先级：= --> ^~ --> ~/~*	#当有多个包含~/~*进行正则匹配时，选择正则表达式最长的location配置执⾏。
+注意：如果uri包含正则表达式，则必须要有 ~ 或者 ~* 标识
+例如：
+	location ~ /\.(gif | jpg | png)$ { }	#匹配根目录下所有以.gif .jpg .png结尾的uri
+
+nginx性能优化：
+#指定nginx进程运行的用户以及用户组，默认为nobody
+user 用户名 用户组;
+#允许同时运行的nginx进程数，一般根据cpu的性能或线程数来设置，默认为1
+worker_processes cpu线程数;
+#单个进程允许同时打开的最大(网页)文件数，默认为无限制
+worker_rlimit_nofile 65535;
+#以上为全局配置
+events {
+    #单个进程允许同时建立的最大tcp连接数(并发数)，默认为1024，不能超过最大打开文件数(worker_rlimit_nofile)
+    worker_connections 32000;
+}
+
+高可用(High Availability)：高度可用性，当一台服务器出现故障或需要维护时，有另一台服务器作为备用。
+原理：主备服务器都共同使用一个虚拟IP，客户端通过虚拟IP来访问网页资源，根据配置文件的优先级来确定优先访问哪台服务器。
+KeepAlived是一个基于VRRP协议来实现的服务高可用方案，可以利用其来避免IP单点故障。
+KeepAlived的作用是检测服务器的状态，如果有一台web服务器宕机，或工作出现故障，KeepAlived将检测到，
+并将有故障的服务器从系统中剔除，同时使用其他服务器代替该服务器的工作，当服务器工作正常后KeepAlived自动将服务器加入到服务器群中，
+这些工作全部自动完成，不需要人工干涉，需要人工做的只是修复故障的服务器。
+两台服务器都安装上nginx和keepalived：
+yum install -y keepalived
+在主备上都编辑配置文件：
+vim /etc/keepalived/keepalived.conf
+! Configuration File for keepalived
+global_defs {
+   router_id LVS_DEVEL	#主备一样
+}
+#可以实现一台机器挂了，虚拟IP会跳到另外的机器上继续运行，使用如下脚本检查nginx进程状态
+vrrp_script nginx_check {			#注意：函数定义必须写在调用的前面
+    script "/etc/keepalived/nginx_check.sh"	#脚本路径
+    interval 2	#机器宕机时脚本调用的次数
+    weight 2
+}
+ 
+vrrp_instance VI_1 {
+    state BACKUP		#主MASTER  备BACKUP
+    interface eth0		#绑定的网卡
+    nopreempt		#备机(BACKUP)才用，不抢占的意思
+    virtual_router_id 51		#组id，主备需要一致
+    priority 99			#优先级，主比备高，主100，备99
+    advert_int 1			#检查间隔1s
+    authentication {
+        auth_type PASS
+        auth_pass 1111		#认证密码，可以修改主备相同
+    }
+    track_script {
+	nginx_check		#调用nginx检查函数
+    }
+    virtual_ipaddress {
+        192.168.1.100/24		#添加虚拟IP(vip)，自己设置，要跟内网同一个网段
+    }
+}
+
+通过shell脚本来检测nginx服务是否在运行、控制主备服务器状态：
+vim /etc/keepalived/nginx_check.sh	#在主备上都创建nginx进程检查脚本
+#!/bin/bash
+ps -C nginx --no-header	#查看nginx进程是否存在
+if [ $? -eq 1 ];then		#如果nginx进程不存在
+  /usr/sbin/nginx		#尝试重启nginx
+  if [ $? -eq 0 ];then		#如果nginx重启成功
+    exit 1			#返回非0结果，不跳转到备用服务器
+  else
+    pkill -9 keepalived	#关闭当前机器的keepalived进程，虚拟ip跳转到备用服务器
+    exit 0			#返回0
+  fi
+fi
+
+chmod +x nginx_check.sh	#赋予脚本可执行权限
+sed -i '/SELINUX/s/enforcing/disabled/' /etc/selinux/config	#/SELINUX/为匹配包含//内的字符的行
+setenforce 0	#必须要关闭selinux，keepalived才能生效
+systemctl enable keepalived -now	#永久启动高可用(主从)
+之后不需要再启动nginx，keepalived的检测脚本会自动启动nginx。
+tail -f /var/log/messages|grep Keepalived	#查看日志
+curl 192.168.1.100		#访问虚拟IP，为效果明显，可以修改主备服务器的网页内容以便区分
+高可用-主从模式：使用一个虚拟IP，一台主服务器和一台从服务器，只有主服务器对外提供服务，从服务器的资源在主服务器不出现故障时永远处于浪费状态。
+高可用-主主模式：使用两个虚拟IP使两台服务器都对外提供服务，两台服务器都绑定两个互为主备的虚拟IP，当其中一台机器出现故障时，
+两台机器的请求都转移到一台机器上，还可以通过nginx提供的负载均衡功能或dns负载均衡分发到这两个虚拟IP上。
+配置nginx+keepalived主主模式：
+第一台服务器：
+	master：10.100.1.200(优先级高)
+	slave：10.100.1.220(优先级低)
+第二台服务器：
+	master：10.100.1.220(优先级高)
+	slave：10.100.1.200(优先级低)
+注意：两台服务器的router_id和virtual_router_id在主主模式下不能一样
+第一台服务器的keepalived配置：
+! Configuration Filefor keepalived  
+global_defs {  
+    router_id nginx_node_01
+}  
+vrrp_script nginx_check {
+    script "/etc/keepalived/nginx_check.sh"
+    interval 2
+    weight 2
+}
+vrrp_instance VI_1{  
+   state MASTER
+   interface ens33
+   virtual_router_id 20
+   priority 100  
+   advert_int 1  
+   authentication {  
+       auth_type PASS  
+       auth_pass 1111  
+   }  
+   virtual_ipaddress {  
+       10.100.1.200/24
+   }  
+} 
+vrrp_instance VI_2{  
+   state BACKUP
+   interface ens33
+   virtual_router_id 22
+   priority 80
+   advert_int 1  
+   authentication {  
+       auth_type PASS
+       auth_pass 1111  
+   }
+   virtual_ipaddress {
+       10.100.1.220/24
+   }
+   track_script {                     
+       nginx_check
+   }
+}
+第二台服务器的keepalived配置：
+! Configuration Filefor keepalived  
+global_defs {  
+    router_id nginx_node_02
+}  
+vrrp_script nginx_check {
+    script "/etc/keepalived/nginx_check.sh"
+    interval 2
+    weight 2
+}
+vrrp_instance VI_1{  
+   state BACKUP
+   interface ens33 
+   virtual_router_id 20
+   priority 80 
+   advert_int 1  
+   authentication {  
+       auth_type PASS  
+       auth_pass 1111  
+   }  
+   virtual_ipaddress {  
+       10.100.1.200/24
+   }  
+} 
+vrrp_instance VI_2{  
+   state MASTER
+   interface ens33
+   virtual_router_id 22
+   priority 100
+   advert_int 1  
+   authentication {  
+       auth_type PASS
+       auth_pass 1111  
+   }
+   virtual_ipaddress {
+       10.100.1.220
+   }
+   track_script {                     
+       nginx_check
+   }
+}
+
+两台服务器都启动keepalived服务：
+yum install -y keepalived	#之后keepalived会自动启动nginx服务
+测试：
+curl 10.100.1.200
+curl 10.100.1.220
+主主模式下可通过访问两个虚拟IP来分别访问两台服务器，有效利用了两台服务器的资源，当有一台机器宕机时，依旧能访问这两个虚拟IP
+为了能更加有效地利用服务器资源，还可以在前面再加一台nginx服务器配置负载均衡分发到这两个虚拟IP上，或者使用同一个域名解析到这两个虚拟IP上
+
+VRRP介绍：
+VRRP全称 Virtual Router Redundancy Protocol，即"虚拟路由冗余协议"。
+可以认为它是实现路由器高可用的容错协议，即将N台提供相同功能的路由器(主机)组成一个路由器组(Router Group)，
+这个组里面有一个master和多个backup，但在外界看来就像一台一样，构成虚拟路由器，
+拥有一个虚拟IP(VIP - Virtual IP，也就是路由器所在局域网内其他机器的默认路由)，
+占有这个IP的master实际负责ARP响应和转发IP数据包，组中的其它路由器作为备份的角色处于待命状态。
+master会发组播消息，当backup在超时时间内收不到vrrp包时就认为master宕掉了，
+这时就需要根据VRRP的优先级来选举一个backup当master，保证路由器的高可用。
+
+在VRRP协议实现里，虚拟路由器使用 00-00-5E-00-01-XX 作为虚拟MAC地址，
+XX就是唯一的 VRID （Virtual Router IDentifier），这个地址同一时间只有一个物理路由器占用。
+在虚拟路由器里面的物理路由器组里面通过多播IP地址 224.0.0.18 来定时发送通告消息。
+每个Router都有一个 1-255之间的优先级别，级别最高的（highest priority）将成为主控（master）路由器。
+通过降低master的优先权可以让处于backup状态的路由器抢占（pro-empt）主路由器的状态，
+两个backup优先级相同的IP地址较大者为master，接管虚拟IP。
+
+参考资料：
+http://fisherworks.cn/?p=3541
+http://www.cncsto.com/article/1984
+https://zhuanlan.zhihu.com/p/166304639
+https://www.jianshu.com/p/bb8cb34e0284
+https://www.zhihu.com/question/24723688
+https://www.cnblogs.com/niesaisai/p/8127469.html
+https://www.cnblogs.com/mzhaox/p/11215036.html
+https://blog.csdn.net/qq_46312987/article/details/118895520
+https://blog.csdn.net/qq_26420601/article/details/110261184
+https://blog.csdn.net/qq_38992249/article/details/117387083
+https://blog.csdn.net/qq_41453285/article/details/106312967
+https://baijiahao.baidu.com/s?id=1672649081319142060&wfr=spider&for=pc
+https://www.cnblogs.com/wuguofeng/p/15206947.html
+https://blog.csdn.net/chuanchengdabing/article/details/119727185
+https://blog.csdn.net/weixin_52270081/article/details/118341576
+https://blog.huati365.com/922f1ad193da25a1
+https://www.jianshu.com/p/b147a719f740
+https://www.sohu.com/a/547873141_120122487
+http://m.bubuko.com/infodetail-3250218.html
+https://blog.csdn.net/wzj_110/article/details/110142902
+https://baijiahao.baidu.com/s?id=1704543670669857039&wfr=spider&for=pc

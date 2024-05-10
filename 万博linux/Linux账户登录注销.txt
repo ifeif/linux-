@@ -1,0 +1,9 @@
+su -l root			登录root用户(root可省略)
+su(switch user) 用户名	登录指定用户(root可省略)
+su - 用户名	#切换到新的用户的同时把环境变量也变更为新用户的
+sudo(super user do) 命令	#暂时使用超级用户执行该命令
+sudo -i		#使用root权限5分钟
+
+exit或logout	#注销当前用户
+id		#查看当前用户信息
+Ctrl+D键		#关闭当前shell，相当于退出当前用户。

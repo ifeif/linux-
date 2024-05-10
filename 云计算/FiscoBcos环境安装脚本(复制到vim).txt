@@ -1,0 +1,53 @@
+yum install -y wget
+wget http://mirrors.aliyun.com/repo/Centos-7.repo -O /etc/yum.repos.d/CentOS-Base.repo
+yum clean all
+yum makecache
+yum install -y openssl openssl-devel
+[ -d ~/fisco ] || mkdir -p ~/fisco && cd ~/fisco
+[ -f build_chain.sh ] || curl -#LO https://osp-1257653870.cos.ap-guangzhou.myqcloud.com/FISCO-BCOS/FISCO-BCOS/releases/v2.8.0/build_chain.sh
+[ -d /root/fisco/nodes ] || bash build_chain.sh -l 127.0.0.1:4 -p 30300,20200,8545
+cd nodes/127.0.0.1
+./start_all.sh
+#安装gcc
+yum -y install make gcc g++ gcc-c++ libtool autoconf automake imake mysql-devel libxml2-devel expat-devel
+yum -y install zlib-devel bzip2-devel openssl-devel ncurses-devel sqlite-devel readlinedevel tk-devel gdbm-devel db4-devel libpcap-devel xz-devel libffi-devel
+#安装java
+yum -y install lrzsz
+cd /usr/local/src
+echo "请上传jdk安装包"
+[ -f jdk-8u271-linux-x64.tar.gz ] || rz && tar -zxf jdk-8u271-linux-x64.tar.gz
+mv jdk1.8.0_271 /usr/local/java
+#添加java环境变量到profile文件
+if test $JAVA_HOME;then
+echo "环境变量已存在"
+else
+echo export JAVA_HOME=/usr/local/java >> /etc/profile
+echo export PATH=$PATH:$JAVA_HOME/bin >> /etc/profile
+echo export CLASSPATH=.:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar >> /etc/profile
+echo export JRE_HOME=$JAVA_HOME/jre >> /etc/profile
+source /etc/profile
+fi
+#安装python
+cd /usr/local/src
+#[ -f Python-3.7.5.tgz ] || wget https://www.python.org/ftp/python/3.7.5/Python-3.7.5.tgz && tar -zxf Python-3.7.5.tgz
+echo "请上传python安装包"
+[ -f Python-3.7.5.tgz ] || rz && tar -zxf Python-3.7.5.tgz
+[ -d /usr/local/python3 ] || mkdir /usr/local/python3
+cd Python-3.7.5
+./configure --prefix=/usr/local/python3
+make && make install
+ln -s /usr/local/python3/bin/python3.7 /usr/bin/python3
+ln -s /usr/local/python3/bin/pip3.7 /usr/bin/pip3
+cd ~/fisco
+[ -f download_console.sh ] || curl -#LO https://gitee.com/FISCO-BCOS/console/raw/master/tools/download_console.sh && bash download_console.sh
+cd ~/fisco/console/conf
+cp ./config-example.toml ./config.toml
+cd ~/fisco/console/conf/
+cp ~/fisco/nodes/127.0.0.1/sdk/ca.crt ./
+cp ~/fisco/nodes/127.0.0.1/sdk/node.crt ./
+cp ~/fisco/nodes/127.0.0.1/sdk/node.key ./
+cp ~/fisco/nodes/127.0.0.1/sdk/sdk.crt ./
+cp ~/fisco/nodes/127.0.0.1/sdk/sdk.key ./
+cd ~/fisco/console
+history -c
+./start.sh

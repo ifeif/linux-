@@ -1,0 +1,85 @@
+FTP(File Transfer Protocol，文件传输协议):
+FTP是 TCP/IP 协议组中的协议之一。FTP协议包括两个组成部分，其一为FTP服务器，其二为FTP客户端。
+其中FTP服务器用来存储文件，用户可以使用FTP客户端通过FTP协议访问位于FTP服务器上的资源。
+在开发网站的时候，通常利用FTP协议把网页或程序传到Web服务器上。
+此外，由于FTP传输效率非常高，在网络上传输大的文件时，一般也采用该协议。
+
+默认情况下FTP协议使用TCP端口中的20和21这两个端口，其中20用于传输数据，21用于传输控制信息。
+但是，是否使用20作为传输数据的端口与FTP使用的传输模式有关，如果采用主动模式，
+那么数据传输端口就是20；如果采用被动模式，则具体最终使用哪个端口要服务器端和客户端协商决定。
+
+20号端口：传输数据
+21号端口：传输命令
+主动(port)方式的连接过程：
+客户端向服务器的ftp端口(默认是21)发送连接请求，服务器接受连接，建立一条命令链路。
+当需要传送数据时，服务器从20端口向客户端的空闲端口发送连接请求，建立一条数据链路来传送数据。
+总结：主动模式由服务器主动从20号数据端口向客户端发送数据传输请求。
+=============================================================
+被动(pasv)方式的连接过程：
+客户端向服务器的ftp端口(默认是21)发送连接请求，服务器接受连接，建立一条命令链路。
+当需要传送数据时，客户端向服务器的空闲端口发送连接请求，建立一条数据链路来传送数据。
+总结：被动模式由客户端向服务器发送数据传输请求，不占用20号数据端口，由服务器和客户端协商决定使用哪个未占用的端口创建数据链路。
+(客户端向服务器的命令端口发起连接请求后，服务器开启并发送空闲端口信息给客户端，由客户端连接该端口，服务器被动接收数据传输)
+=============================================================
+win10客户端可通过Internet选项的高级选项卡来选择是否开启被动模式。
+
+yum install -y vsftpd	#安装vsftp服务
+vim /etc/vsftpd/vsftpd.conf	#编辑vsftp主配置文件
+anonymous_enable=YES	#是否允许匿名用户登录
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+anon_other_write_enable=YES	#其他权限(删除修改)
+anon_umask=000		#匿名用户创建文件的默认权限
+anon_root=/var/ftp		#匿名用户根目录(登录目录)，默认为/var/ftp
+
+write_enable=YES		#所有用户是否可写
+local_enable=NO		#是否允许本地用户登录
+local_root=/var/ftp		#指定本地用户根目录
+local_umask=000		#本地用户创建文件的默认权限
+
+chroot_list_enable=YES	#是否启用切换根目录名单，并且该根目录必须为不可写
+chroot_local_user=NO	#是否允许本地用户切换根目录
+chroot_list_file=/etc/vsftpd/chroot_list
+
+userlist_enable=YES		#是否启用用户登录名单
+userlist_deny=YES		#是否为拒绝名单
+userlist_file=/var/vsftpd/user_list
+
+允许root登录：
+vim /etc/vsftpd/user_list
+把root删掉
+vim /etc/vsftpd/ftpusers
+把root删掉
+
+chmod o+w /var/ftp/pub	#修改匿名用户文件权限
+systemctl start vsftpd	#启动vsftpd
+配置selinux：
+getsebool -a | grep ftp
+setsebool -P ftpd_full_access=on
+或者
+setsebool -P ftpd_anon_write=on
+chcon -R -t public_content_rw_t /var/ftp
+
+配置防火墙：
+firewall-cmd --add-service=ftp --permanent
+firewall-cmd --reload
+
+yum install -y ftp	#客户端工具，可访问window的ftp服务
+ftp 目标IP
+输入用户名：anonymous
+输入密码：直接回车
+
+默认匿名用户根目录：
+/var/ftp
+注：由于/var/ftp目录不能设为可写，所以该目录下的pub为匿名用户的可写目录
+默认本地用户根目录：
+/home/用户名/
+默认root用户根目录：
+/root
+备注：
+设置为不能改变根的目录不能为可写(chroot_local_user=NO)
+目录的可写意思是用户对该目录下的文件或目录可写
+
+参考资料：
+https://www.budongyun.com/ftp/4886/
+https://www.680.com/it/1912/shouji-327740.html

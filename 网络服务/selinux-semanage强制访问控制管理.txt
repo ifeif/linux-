@@ -1,0 +1,66 @@
+Security Enhanced Linux由两部分组成：
+selinux域限制可确保服务程序做不了越权的操作。
+selinux安全上下文确保文件资源只能被其所属的服务程序进行访问。
+selinux安全上下文工作原理：服务进程的安全上下文和文件的安全上下文进行比较，相同则通过。
+
+setenforce 0	#临时关闭 
+setenforce 1	#临时启动
+getenforce	#查看状态
+sestatus		#查看selinux的详细配置信息
+vim /etc/selinux/config	#编辑selinux主配置文件，永久生效
+SELINUX=enforcing | permissive | disabled
+enforcing：强制开启selinux
+permissive：只发出警告而不强制拦截
+disabled：关闭selinux
+
+selinux布尔变量：
+布尔变量的设置对服务程序的运行起着控制作用。
+getsebool -a | grep 关键字		#获取相关的布尔变量，-a：所有
+getsebool 变量名			#获取变量的值
+setsebool -P 变量名=0 | 1 | off | on	#设置布尔变量的状态，-P：永久生效
+
+什么是安全上下文：
+在文件上设置的安全上下文是由用户段、角色段、类型段组成。
+用户段：user_u代表进程身份
+角色段：role_r代表目录角色
+类型段：type_t代表服务类型
+
+ls -Z 文件			#查看文件的安全上下文
+ls -dZ 目录		#查看目录的安全上下文
+chcon -R -t 字段名 目录	#修改安全上下文，-R：递归，-t：修改指定类型段
+semanage命令是用来查询与修改SELinux默认目录的安全上下文。SELinux的策略与规则管理相关命令：
+seinfo命令、sesearch命令、getsebool命令、setsebool命令、semanage命令。
+
+语法：
+semanage {login|user|port|interface|fcontext|translation} [选项] [文件] 
+例子：
+semanage fcontext -{a|d|m} [-frst] file_spec
+
+fcontext：目录安全上下文
+port：端口
+user：用户
+
+semanage fcontext -l	#查询所有已配置的安全上下文
+添加web目录及目录下的文件安全上下文：
+#目录的设定可以使用正则表达式去指定一个范围
+semanage fcontext -a -t httpd_sys_content_t "/web(/.*)?"	#这条命令不会对目录的修改生效
+restorecon -Rv /web	#使semanage命令修改立即生效
+或者
+chcon -R -t httpd_sys_content_t /web	#递归修改安全上下文
+
+选项：
+-l：查询
+-a：增加
+-m：修改
+-d：删除
+
+semanage port -l		#查看selinux中给各个服务提供的默认端口
+semanage port -l | grep http	#查看与http服务相关的端口
+示例：
+semanage port -a -t http_port_t -p tcp 8909
+其中-a表示添加，-t表示类型也就是http_port_t，-p表示协议也就是tcp协议
+
+参考资料：
+https://ywnz.com/linux/semanage/
+http://c.biancheng.net/linux_tutorial/18/
+

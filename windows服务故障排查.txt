@@ -1,0 +1,60 @@
+打开网络适配器窗口:
+ncpa.cpl
+系统检测工具directX:
+dxdiag
+系统启动配置工具：
+msconfig
+关闭进程：
+tasklist			#列出所有进程
+taskkill -f -im 进程名		#终止进程
+查看系统的TCP参数：
+netsh int tcp show global
+关闭ecn显式拥塞通知：
+netsh interface tcp set global ecn=disabled
+备注：个人操作系统win10/win11的ecn默认是关闭的，而windowserver从2012开始是默认开启的。
+只有两端都开启ecn并且底层网络(路由器)支持时才生效，如只有一端开启ecn，windows在发送2次请求包没有得到响应后，
+会采用没有ecn标志位的syn包来建立TCP连接，关闭ecn可加快TCP连接的建立速度。
+网络状态:
+netstat -an		#查看开启的端口  a:all  n:number
+netstat -rn		#查看所有的路由  r:route
+netstat -nb		#显示所有占用网络的进程
+
+ipconfig			#查看网卡信息
+net use * /delete		#清除网络共享连接
+
+ipconfig /displaydns	#查看dns缓存
+ipconfig /flushdns		#刷新dns缓存
+
+ipconfig /release		#释放当前动态获取的IP
+ipconfig /renew		#重新获取动态IP(DHCP)
+
+arp -d			#清除所有arp缓存
+arp -a			#查看arp缓存
+
+路由:
+route print		#查看路由表
+route add 0.0.0.0  mask  0.0.0.0  192.168.1.1	#配置默认路由
+
+win10用户管理(Net Person Login Wizard)：
+按Win+R组合键，输入netplwiz确定。
+该管理界面可以删除密码和用户。
+
+win10清理系统：
+查看是否可清理
+Dism.exe /Online /Cleanup-Image /AnalyzeComponentStore
+开始清理
+Dism.exe /Online /Cleanup-Image /StartComponentCleanup
+
+win10查看笔记本电池损耗：
+powercfg /batteryreport /output "C:\battery_report.html"
+如果执行失败则需要将Diagnostic Policy Service服务设为手动启动
+
+win10修复系统：
+sfc /scannow 
+这条命令将扫描所有受保护的系统文件，并用位于C:\Windows\System32\dllcache的压缩文件夹中的缓存副本替换损坏的文件。
+Dism /Online /Cleanup-Image /ScanHealth
+这条命令将扫描全部系统文件并和官方系统文件对比，扫描计算机中的不一致情况。
+Dism /Online /Cleanup-Image /CheckHealth
+这条命令必须在前一条命令执行完以后，发现系统文件有损坏时使用。
+DISM /Online /Cleanup-image /RestoreHealth
+这条命令把损坏的系统文件还原成官方系统文件。

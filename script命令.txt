@@ -1,0 +1,12 @@
+script命令的功能非常强大，可以录制用户在终端上的所有操作，并以文本文件的形式保存。
+
+开始录制操作：
+script -t 2>timing.log -a output.session
+录制过程命令省略
+exit结束录制
+
+script命令中-t参数默认将时序信息导入stderr。2>正好把stderr的时序信息输出到文件timing.log
+script命令中-a参数表示把命令信息输出到文件output.session
+
+回放录制的操作：
+scriptreplay timing.log output.session

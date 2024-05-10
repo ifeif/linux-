@@ -1,0 +1,129 @@
+创建hadoop用户
+sudo useradd -m hadoop -s /bin/bash
+sudo passwd hadoop
+sudo adduser hadoop sudo
+
+
+SSH秘钥
+sudo apt-get update
+sudo apt-get install openssh-server
+ssh localhost
+cd ~/.ssh
+ssh-keygen -t rsa
+cat ./id_rsa.pub >> ./authorized_keys
+ssh localhost
+
+
+JAVA环境配置
+sudo apt-get install default-jre default-jdk
+gedit ~/.bashrc
+export JAVA_HOME=/usr/lib/jvm/default-java
+source ~/.bashrc
+echo $JAVA_HOME
+java -version
+$JAVA_HOME/bin/java -version
+
+
+安装hadoop
+cat hadoop-2.6.0.tar.gz.mds | grep 'MD5'
+mdSsum hadoop-2.6.0.tar.gz | tr "a-z" "A-z"
+sudo tar -zxf hadoop-2.6.0.tar.gz -C /usr/local
+cd /usr/local
+sudo mv hadoop-2.6.0 hadoop
+sudo chown -R hadoop ./hadoop
+
+
+hadoop字符串检索
+cd /usr/local/hadoop
+./bin/hadoop version
+mkdir input
+cp ./etc/hadoop/*.xml ./input
+./bin/hadoop jar ./share/hadoop/mapreduce/hadoop-mapreduce-exmaples-*.jar grep ./input ./output 'dfs[a-z]+'
+rm -r output
+
+
+hadoop词频统计
+mkdir workspace
+cd workspace
+gedit WordCount.java
+export PATH=$JAVA_HOME/bin:$PATH
+export HADOOP_CLASSPATH=$JAVA_HOME/lib/tools.jar
+../bin/hadoop com.sun.tools.javac.Main WordCount.java
+ls -l
+jar cf WordCount.jar WordCount*.class
+ls -l
+mkdir input
+cd input
+echo 'Hello World Bye World' > file01
+cat file01
+bin/hadoop jar workspace/WordCount.jar WordCount input output
+cat output/*
+
+
+hadoop分布式部署
+gedit ./etc/hadoop/core-site.xml
+<property>
+<name>hadoop.tmp.dir</name>
+<value>file:/usr/local/hadoop/tmp</value>
+<description>Abase for other temporary directories.</description>
+</property>
+<property>
+<name>fs.defaultFS</name>
+<value>hdfs://localhost:9000</value>
+</property>
+
+gedit ./etc/hadoop/hdfs-site.xml
+<property>
+<name>dfs.relication</name>
+<value>1</value>
+</property>
+<property>
+<name>dfs.namenode.name.dir</name>
+<value>file:/usr/local/hadoop/tmp/dfs/name</value>
+</property>
+<property>
+<name>dfs.datanode.data.dir</name>
+<value>file:/usr/local/hadoop/tmp/dfs/data</value>
+</property>
+
+./bin/hdfs namenode -format
+./sbin/start-dfs.sh
+export HADOOP_HOME=/usr/local/hadoop
+export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
+./sbin/start-dfs.sh
+jps
+
+DateNode没有启动的解决方法
+./sbin/stop-dfs.sh
+rm -r ./tmp
+./bin/hdfs namenode -format
+./sbin/start-dfs.sh
+
+localhost:50070
+
+./bin/hdfs dfs -mkdir -p /user/hadoop
+./bin/hdfs dfs -mkdir input
+./bin/hdfs dfs -put ./etc/hadoop/*.xml input
+./bin/hdfs dfs -ls input
+./bin/hadoop jar ./share/hadoop/mapreduce/hadoop-mapreduce-exmaples-*.jar grep ./input ./output 'dfs[a-z]+'
+./bin/hdfs dfs -cat output/*
+./bin/hdfs dfs -get output ./output
+./sbin/stop-dfs.sh
+jps
+
+mv ./etc/hadoop/mapred-site.xml.template ./etc/hadoop/mapred-site.xml
+gedit ./etc/hadoop/mapred-site.xml
+<property>
+<name>mapreduce.framework.name</name>
+<value>yarn</value>
+</property>
+
+gedit ./etc/hadoop/yarn-site.xml
+<property>
+<name>yarn.nodemanager.aux-services</name>
+<value>mapreduce_shuffle</value>
+</property>
+
+./sbin/start-yarn.sh
+./sbin/mr-jobhistory-daemon.sh start historyserver
+localhost:8088

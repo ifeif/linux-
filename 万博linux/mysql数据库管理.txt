@@ -1,0 +1,54 @@
+mysql默认内置了4个系统数据库，分别是sys、mysql、information_schema、performance_schema。
+information_schema库：
+	保存mysql服务器上所有数据库的信息，如数据库名、数据库的表、访问权限、数据表的数据类型、数据库索引等信息。
+performance_schema库：
+	主要用于收集数据库服务器的性能参数，监控数据库在运行过程中消耗的资源。
+sys库：
+	sys库中的表来自performance_schema，简化了performance_schema中的信息。
+mysql库：
+	存储数据库服务器的注册用户信息、权限设置、关键字等，存储mysql数据库需要使用的控制和管理信息。
+mysql引擎：
+	1.InnoDB：只有该引擎支持外键约束，是mysql的默认引擎。容错率最高。
+	2.MyISAM：不支持事务和外键约束，它提供高速存储和检索以及全文搜索。
+	3.MEMORY：性能最佳，它将表存储在系统内存中，但会有数据丢失的风险。
+	适用于创建临时表时使用，它还要求数据表中的数据使用定长的数据类型。
+查看MySQL支持的存储引擎：
+	show engines;
+修改指定表的存储引擎：
+	alter table 表名 engine=存储引擎名
+修改MySQL默认存储引擎：
+	打开my.cnf配置文件，在[mysqld]最后添加default-storage-engine=存储引擎名
+约束：
+主键：用来确定数据唯一性的一个表头，添加主键的同时系统自动添加该主键的引索
+外键：另一个表的主键作为当前表的一个表头
+主键和外键一般用来表达多个表之间数据的对应关系
+
+字符集(character set)：
+是字符在数据库中编码的集合和编码规则。编码规则就是定义用什么样的二进制存储字符。
+字符编码方式是用一个或多个字节的二进制形式存储字符集中的一个字符，每种字符集都有自己独有的编码方式。
+常见的字符集有国际通用字符集unicode，中文字符集gb2312，gbk在gb2312的基础上扩充，几乎所有字符集都兼容英文字符集ascii。
+
+字符编码：
+show character set;			#查询系统支持的字符集
+show variables like '%character%';	#查询系统默认的字符集
+set names utf8;			#设置系统字符集
+在创建数据库时，如果不指定字符集和编码规则，则使用服务器默认的。
+utf-8的mysql字符集：utf8
+urf-8的mysql编码规则：utf8_general_ci
+创建数据库并设置编码规则：
+	create database 数据库名
+	character set 字符集 collate 编码规则
+修改数据库的编码规则：
+	alter database 数据库名
+	character set 字符集 collate 编码规则
+删除数据库：
+	drop database if exists 数据库名	#添加if exists的目的是避免sql语句执行时报错
+使用数据库进行操作：
+	use 数据库名;
+显示所有数据库：
+	show databases;
+显示数据库中的所有表：
+	show tables;
+显示创建数据库时的sql原语句：
+	show create database 数据库名;
+

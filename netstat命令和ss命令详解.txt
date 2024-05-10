@@ -1,0 +1,96 @@
+netstat命令(性能一般)：
+netstat(Network Statistics)是一个TCP/IP网络状况分析工具，一般用于确定网络问题，它可以显示路由信息、接口信息、端口信息、网络连接状态。
+netstat命令来自net-tools软件包，如果系统没有安装则需要先执行yum install net-tools，比较遗憾的是，net-tools软件包自2001年起便不再更新和维护了。
+netstat [选项]
+-a或--all：显示所有连接中和监听中的Socket
+-l或--listening：仅显示监听中的Socket连接(包含udp监听)
+-n或--numeric：Socket连接以数字(ip地址)的形式显示，而不通过域名服务器进行反向解析(不显示域名)
+-p或programs：显示与连接相关的进程信息(Pid/Program Name)
+-r或--route：显示路由表信息(Routing Table)
+-t或--tcp：仅显示TCP协议的连接状态
+-u或--udp：仅显示UDP协议的连接状态
+-v或--verbose：显示命令执行的详细信息
+-i或--interfaces：显示网络接口信息
+-o或--timers：显示计时器信息(如保持keepalive状态的剩余时长)
+-e或--extend：显示Socket连接的其他相关信息(如用户id)
+-g或--groups：显示网络接口的组播成员信息
+-c或--continuous：每隔一个固定时间(以秒为单位)，执行netstat命令
+-Z或--context：显示套接字连接的SELinux安全上下文
+-s或--statistics：按照协议分类显示统计信息。默认的显示IP、IPv6、ICMP、ICMPv6、TCP、TCPv6、UDP和UDPv6 的统计信息
+
+输出内容解释：
+Proto	此套接字所使用的协议
+Recv-Q	接收队列，此连接的接收队列中的字节数，表示收到的数据中还有多少没有被进程取走
+Send-Q	发送队列，此连接的发送队列中的字节数，表示对方还没有收到的数据或没有响应ACK确认
+Local Address	此套接字在本端的地址和端口号
+Foreign Address	此套接字在远端的地址和端口号
+State	此套接字的状态(只对TCP协议有意义)
+
+netstat中的TCP状态：
+已确定：
+CLOSED		已关闭连接(初始状态)
+ESTABLISHED	已建立连接，完成TCP三次握手后，主动连接端和被动连接端进入ESTABLISHED状态
+LISTEN		监听状态，等待远程主机的连接请求
+握手：
+SYN_SENT	发送同步请求(请求建立连接)，在TCP三次握手期间，主动连接端发送了SYN包后，进入SYN_SENT状态，等待对方的ACK包
+SYN_RECV	正在确认同步请求，在TCP三次握手期间，被动连接端收到SYN包后，进入SYN_RECV状态，并向对方发送SYN+ACK包
+挥手：
+FIN_WAIT_1 	本端主动发送关闭请求，在TCP四次挥手时，主动关闭端发送FIN包后，进入FIN_WAIT_1状态。
+FIN_WAIT_2	本端等待接收远端的关闭请求，在TCP四次挥手时，主动关闭端收到ACK包后，进入FIN_WAIT_2状态。
+TIME_WAIT	本端已主动关闭连接，等待一段时间(最多为4分钟)该端口才能重新分配，确保服务器正常关闭该连接，在TCP四次挥手时，主动关闭端发送了ACK包之后，进入TIME_WAIT状态，等待最多MSL时间，让被动关闭端收到ACK包。
+CLOSING		连接关闭中，在TCP四次挥手期间，主动关闭端发送了FIN包后，没有收到对应的ACK包，却收到对方的FIN包，此时，进入CLOSING状态。
+CLOSE_WAIT	远端等待发送关闭请求，在TCP四次挥手期间，被动关闭端收到FIN包后，进入CLOSE_WAIT状态。
+LAST_ACK	远端等待接收最后确认关闭请求，在TCP四次挥手时，被动关闭端发送FIN包后，进入LAST_ACK状态，等待对方的ACK包。
+
+主动连接端可能的状态有：    CLOSED        SYN_SEND        ESTABLISHED
+主动关闭端可能的状态有：    FIN_WAIT_1    FIN_WAIT_2      TIME_WAIT
+被动连接端可能的状态有：    LISTEN        SYN_RECV        ESTABLISHED
+被动关闭端可能的状态有：    CLOSE_WAIT    LAST_ACK        CLOSED
+
+例子：
+1、列出所有端口情况
+netstat -a      # 列出所有端口
+netstat -at     # 列出所有TCP端口
+netstat -au     # 列出所有UDP端口
+2、列出所有处于监听状态的 Sockets
+netstat -l   # 只显示监听端口
+netstat -lt  # 显示监听TCP端口
+netstat -lu  # 显示监听UDP端口
+netstat -lx  # 显示监听UNIX端口
+3、显示核心路由信息
+netstat -rn   # 显示数字格式，不查询主机名称
+Kernel IP routing table
+Destination	Gateway		Genmask		Flags	MSS	Window	irtt	Iface
+0.0.0.0		192.168.130.1	0.0.0.0		UG	0	0	0	eth0
+192.168.130.0	0.0.0.0		255.255.255.0	U	0	0	0	eth0
+4、查看端口和服务
+netstat -antp | grep ssh     
+netstat -antp | grep 22
+
+ss命令(性能更高)：
+ss(Socket Statistics)可以用来获取socket统计信息，它也可以显示和netstat类似的内容。
+ss的优势在于它能够显示更多更详细的有关TCP和连接状态的信息，而且比netstat命令的执行效率更高(在连接数很大的情况下更为明显)。
+ss命令来自iproute软件包，这是一套支持IPv4/IPv6的TCP/IP网络管理工具集，如今大多数的Linux都默认安装该软件包。
+ss [选项]
+-a：显示所有socket连接
+-l：仅显示所有监听中的socket连接(包含udp监听)
+-t：仅显示tcp连接
+-u：仅显示udp连接
+-4：仅显示IPv4连接
+-6：仅显示IPv6连接
+-p：显示进程信息
+-s：按协议分类显示网络连接数
+-e：显示sockets连接的其他相关信息(如创建该连接的用户)
+-o：显示计时器信息(如保持keepalive状态的剩余时长)
+-n：显示端口号，而不显示服务名
+-r：显示主机名(域名)，而不显示IP地址
+-m：显示socket连接的内存使用情况
+-i：显示TCP报文内部信息
+
+参考资料：
+https://www.cnblogs.com/wsw-seu/p/10585921.html
+https://blog.csdn.net/qq_39341113/article/details/103560504
+https://zhuanlan.zhihu.com/p/367635200
+https://www.jianshu.com/p/61f6d4cacc47
+https://www.cnblogs.com/yangleitao/p/9583280.html
+https://www.yiibai.com/linux/ss.html

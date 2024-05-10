@@ -1,0 +1,57 @@
+新出的apt取代apt-get，apt 的主要目的是提供一种以「让终端用户满意」的方式来处理 Linux 软件包
+常用的APT命令参数：
+-h	#查看帮助
+-y	#忽略提示
+-q	#静默安装
+apt list 列出已安装的软件包
+sudo apt update 更新下载源(索引文件)，重新获取(更新)软件包列表
+sudo apt upgrade 更新所有已安装的软件包，如果更新某个软件包时需要安装或更新其依赖项将放弃更新该软件包
+sudo apt dist-upgrade 更新所有已安装的软件包及其依赖项(自动处理升级软件包时的依赖问题)
+sudo apt upgrade package 更新包
+sudo apt install package 安装包
+sudo apt remove package 删除包
+sudo apt purge package 删除包以及配置文件
+sudo apt autoremove 自动清理不需要的依赖
+
+在下载或更新软件包之前运行一次sudo apt update，以保证下载到最新版本的软件包
+软件包安装完之后，ubuntu所有的服务的启动脚本在/etc/init.d/目录下
+
+执行sudo apt update报错：
+部分索引文件下载失败。如果忽略它们，那将转而使用旧的索引文件(软件包列表)。
+解决方法：
+删除/etc/apt/sources.list.d/目录下对应的list文件。
+
+旧版本的apt-get不常用命令：
+apt-cache search package 搜索包
+apt-cache depends package 查看软件包的依赖
+apt-cache show package 获取包的相关信息，如说明、大小、版本等
+sudo apt-get install package - - reinstall 重新安装包
+sudo apt-get -f install 修复安装"-f = ——fix-missing"
+sudo apt-get remove package - - purge 删除包，包括删除配置文件等
+sudo apt-get dist-upgrade 升级系统
+sudo apt-get dselect-upgrade 依照dselect 的选择更新
+apt-cache depends package 了解使用依赖
+apt-cache rdepends package 是查看该包被哪些包依赖
+sudo apt-get build-dep package 安装相关的编译环境
+apt-get source package 下载该包的源代码
+sudo apt-get clean && sudo apt-get autoclean 清理无用的包
+sudo apt-get check 检查是否有损坏的依赖
+
+apt软件源配置文件：
+apt将所有软件源放在一个文件中，该文件的每一行都定义了一个软件源，软件源之间通常用空行隔开。最常用的软件源一般放在前面。
+vim /etc/apt/source.list
+更换阿里apt源(覆盖source.list原内容)：
+deb http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic main restricted universe multiverse
+
+deb http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-security main restricted universe multiverse
+
+deb http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-updates main restricted universe multiverse
+
+deb http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-proposed main restricted universe multiverse
+
+deb http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse
+deb-src http://mirrors.aliyun.com/ubuntu/ bionic-backports main restricted universe multiverse

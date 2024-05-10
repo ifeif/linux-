@@ -1,0 +1,50 @@
+Proxmox VE是一个基于Debian的Linux发行版的开源服务器虚拟化管理软件(平台)，它支持部署和管理虚拟机和容器，
+用于虚拟机的KVM(基于内核的虚拟机)和用于容器的LXC，提供基于Web的管理界面。它还集成了开箱即用的工具，用于配置服务器之间的高可用性，软件定义的存储，网络和灾难恢复。
+可以跨多个服务器节点集群以实现高可用性。部署后，称为Proxmox VE HA Manager的资源管理器将监视整个群集上的所有虚拟机和容器，并在其中一个发生故障时自动采取行动。
+还具有集成的实时/在线迁移功能，这使虚拟机可以从一个Proxmox VE群集节点移动到另一个节点，而无需停机。管理员可以使用脚本或Web界面启动该过程。
+
+VMware ESXi直接安装在物理硬件上，该服务端软件使您可以在单个物理硬件上创建并运行虚拟机。
+平时使用的VMware以window系统作为底层，而ESXI作为虚拟机底层。
+这提供了一个虚拟化层，该层将物理主机的CPU，存储，内存和网络资源抽象为多个虚拟机。
+它还具有一个虚拟机文件系统，可为用户提供虚拟机的高性能群集文件系统。
+
+VMware vCenter(虚拟中心)是管理整个VMware虚拟化基础架构的服务端软件，可以同时管理多台ESXi主机(集群)。
+它根据系统管理员设置的策略管理对主机的虚拟机分配以及对给定主机内的这些虚拟机的资源分配。
+它还支持使用诸如vSphere Distributed Resource Scheduler(DRS)，vSphere High Availability(HA)，
+vSphere vMotion和vSphere Storage vMotion之类的功能。它还提供了适用于vSphere 的API并管理ESXi。
+可以将其安装在Windows的受支持版本上，或用作称为vCenter Server Appliance的预配置Linux版本。
+vCenter Server还允许使用主机配置文件，从而允许用户定义特定ESXi主机的规则。
+
+VMware ESXi支持客户端界面和Web界面管理虚拟化资源，而Proxmox VE只支持Web界面。
+ESXi还使用专有技术来支持虚拟化(用于Intel处理器的VT-x和用于AMD处理器的AMD-V)，
+而Proxmox VE的KVM使用通用的x86虚拟化技术，与PVE相比，ESXi虚拟化性能更强。
+
+ESXi主机的虚拟机进行热迁移必须要在其之间执行的两个ESXi主机中开启vMotion功能。
+并且确保虚拟机数据位于共享存储中，因为热迁移用到了共享存储的技术。
+
+Proxmox VE的相关配置：
+一、配置https证书
+proxmox VE安装完后默认管理地址是https://IP:8006，由于是自签名证书，所以浏览器打开提示证书错误。
+配置域名解析到这个pve的公网IP，申请域名证书
+找到/etc/pve/nodes//-ssl.key和-ssl.pem，把私钥文件(key)和证书文件(pem)替换成域名证书内容
+由于8006端口是写入二进制文件的，所以不能从配置文件修改
+这里通过iptables添加端口转发，将客户端请求的443端口转发到服务端的8006端口
+iptables -t nat -I PREROUTING -d 【服务器IP】 -p tcp --dport 443 -j DNAT --to-destination :8006
+禁止外部访问服务器的8006端口
+iptables -A INPUT -d 【服务器IP】 -p TCP --dport 8006 -j DROP
+二、配置更新源
+Proxmox VE是用于企业虚拟化的完整开源平台，通常，如果不用于商业用途，您可以不为开源软件付费。
+删除原来付费的企业源：
+rm /etc/apt/sources.list.d/pve-enterprise.list
+添加官方免费源：
+echo 'deb http://download.proxmox.com/debian/pve stretch pve-no-subscription' >>/etc/apt/sources.list.d/pve-no-subscription.list
+更新软件包:
+apt update;apt dist-upgrade
+三、关闭订阅提醒
+vim /usr/share/javascript/proxmox-widget-toolkit/proxmoxlib.js
+搜索data.status，把if(data.status!=='Active') 修改为if(false)
+此方法可能在升级pve后失效，失效后再修改即可
+
+参考资料：
+https://blog.csdn.net/allway2/article/details/102846234
+https://blog.csdn.net/weixin_33218578/article/details/113018653

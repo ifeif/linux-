@@ -1,0 +1,110 @@
+由Linux内核管理的时钟与硬件时钟不同。
+bios中的时间没有时区概念，只负责计时；但是操作系统有。
+默认情况下，windows在存取系统时间过程中，将bios时间当做本地时间来操作，所以bios中的时间显示和操作系统中时钟显示一致。
+UOS和其他linux发行版中将bios时钟当做UTC+0:00时间，读取时操作系统时钟会根据当前时区设置，如中国为UTC+8:00，那么系统显示时钟就跟BIOS时钟相差8小时；
+写入时，会将用户设置的新时间转换为UTC+0:00时区时间写入bios中。
+这样做的好处，当系统上存在多个使用不同时区的操作系统的时候，例如一个UTC+8:00的系统和一个UTC+4:00的系统，
+在一个系统中修正了当前时钟后，存入UTC+0:00时区，其他操作系统使用系统时区显示依然是可以正常显示的，不会乱掉；
+而windows的这种做法，会导致本地有多个时区的系统的情况下，进入其他系统都都会错乱。
+这是一个特性，不是一个bug。
+
+Windows可以通过修改注册表将默认逻辑修改为和Linux一致：
+	Windows Registry Editor Version 5.00
+	[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation]
+	"RealTimeIsUniversal"=hex(b):01,00,00,00,00,00,00,00
+以上内容存为.Reg文件，导入，或者手动修改即可让Windows使用UTC时间。
+
+UOS和其他发行版可以使用如下命令让操作系统将本地时间写入bios：
+	sudo timedatectl set-local-rtc 1 --adjust-system-clock
+使用如下命令将bios里的UTC时间保存到系统：
+	sudo timedatectl set-local-rtc 0 --adjust-system-clock
+系统关闭时会同步系统时间到硬件时间，系统启动时会读取硬件时间
+
+Linux 时钟设置
+-------------------------------------------------------------------------------
+查看系统的当前时间和日期
+	timedatectl [status]
+查看当前时区
+	timedatectl | grep Time
+列出所有可用时区
+	timedatectl list-timezones
+要根据地理位置找到本地的时区，运行以下命令
+	timedatectl list-timezones | egrep -o "Asia/S.*"
+	timedatectl list-timezones | egrep -o "Europe/L.*"
+	timedatectl list-timezones | egrep -o "America/N.*"
+-o：仅打印匹配行的匹配(非空)部分，并且每个匹配部分单独输出到每行上
+这样写一下也许看的更明白些
+[root@mycomputer ~]# timedatectl status
+Local time: 	Fri 2020-09-18 14:57:06 CST
+Universal time: 	Fri 2020-09-18 06:57:06 UTC
+RTC time: 	Fri 2020-09-18 06:57:06
+Time zone: 	Asia/Shanghai (CST, +0800)
+NTP enabled: 	yes
+NTP synchronized: 	yes
+RTC in local TZ:	no
+DST active:	n/a
+
+Local time	本地时间 通常为 RTC + 时区
+Universal time	系统时间一直是UTC
+RTC time		硬件时钟的时间，一般也 BIOS 时间
+Time zone	时区， set-timezone就是设置的这个
+NTP enabled	是否开启ntp时间同步
+NTP synchronized	NTP同步是否完成
+RTC in local TZ	是否设置RTC时间，set-local-rtc 选项就是控制该处
+DST active	夏令时
+
+设置硬件时钟：
+	查看你的硬件时钟是否设置为本地时区
+		timedatectl | grep local
+	将硬件时钟设置为本地时区
+		timedatectl set-local-rtc 1
+	将硬件时钟设置为协调世界时（UTC）
+		timedatectl set-local-rtc 0
+
+设置时区：
+	在Linux中设置本地时区，使用set-timezone开关
+		timedatectl set-timezone "Asia/Shanghai"
+	设置local_time为UTC
+		timedatectl set-timezone UTC
+	设置时区相当于将目标时区文件软连接到/etc/localtime，
+	或者替换/etc/localtime文件为目标时区文件
+
+设置时间和日期(支持好多种时间写法)：
+	设置时间
+		timedatectl set-time 15:58:30
+	设置日期
+		timedatectl set-time 20151120
+	设置日期和时间
+		timedatectl set-time '16:10:40 2015-11-20'
+		date -s '22:22:22 2022-4-22'
+
+同步系统及硬件时间：
+	从linux内核获取时间
+		date -R	#-R：以数字的形式显示时区
+	从bios硬件获取时间
+		hwclock --localtime
+	从硬件(bios)读取时间，然后加上时区得到的时间
+		hwclock --show 或 -r
+	当系统时钟与硬件时钟不一致时，可进行同步到同一时间
+		hwclock --systohc 或 -w	#以系统时钟为准，同步(复制)到硬件时钟
+		hwclock --hctosys 或 -s	#以硬件时钟为准，同步(复制)到系统时钟
+注意：date命令输出的时间应该与hwclock命令输出的时间一致
+
+夏令时：
+DST(daylight saving time)也称为夏令时，它是以节约能源为目的而人为规定的一种制度，
+它规定某段时间作为夏令时间，并在标准时间的基础上提前多长时间（通常是一个小时），
+同时DST还规定了规定生效的起始时间和末尾时间，值得注意的是目前只是部分国家实施了夏令时制度。
+其他详情请自己自行google或者百度。
+
+
+NTP即网络时间协议(Network Time Protocol)，用于在计算机之间同步系统时钟
+NTP服务器：提供时间同步服务
+联网获取时间(与NTP服务器同步)：
+apt-get install ntpdate	#安装ntpdate时间同步工具
+ntpdate pool.ntp.org	#同步NTP服务器时间到系统
+或者
+yum install -y ntp		#安装ntp服务
+timedatectl set-ntp true或systemctl enable ntpd	#开启自动同步时间
+更多资料：
+https://blog.csdn.net/weixin_42167759/article/details/90648225
+https://www.cnblogs.com/shu-sheng/p/13691535.html?ivk_sa=1024320u

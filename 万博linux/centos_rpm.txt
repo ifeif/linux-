@@ -1,0 +1,32 @@
+rpm  红帽软件包管理器
+主选项：
+-i	安装软件
+-e	卸载软件
+-q	查询当前系统安装的软件
+
+
+辅助选项
+-i
+	-v 显示安装信息	
+	-h 显示安装进度条
+
+	举例：
+	rpm -ivh /mnt/vim.rpm   安装/mnt里的vim这个rpm软件包，安装过程中显示安装信息和进度条
+
+-e	卸载软件
+
+	举例：
+	rpm -e vim	卸载vim
+
+-q
+	-a	查询所有已安装的软件
+	-l	查看软件的所有文件目录
+	-d	查看软件文档目录
+	-c	查看软件配置文件目录
+	-R	查看软件包的依赖
+举例
+rpm -qa		列出当前系统已经安装的所有软件
+rpm -qa |grep vim	查询当前系统是否有安装vim
+rpm -ql vim	查询vim的配置文件路径
+rpm可以直接安装来自网络的rpm包：
+rpm -ivh https://dev.mysql.com/get/mysql80-community-release-el7-3.noarch.rpm

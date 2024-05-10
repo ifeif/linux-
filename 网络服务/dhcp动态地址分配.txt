@@ -1,0 +1,62 @@
+IP租用请求：DHCP discover
+IP租用提供：DHCP offer
+IP租用选择：DHCP request
+IP租用确定：DHCP ack
+这4个包全是广播包，2和4在某些环境下为单播包，例如思科、华为路由器。
+
+DHCP服务器端口号为UDP67，客户端端口号为UDP68。
+DHCP客户端启动时向当前的子网中发送广播，向同网段的DHCP服务器租用一个IP地址。
+服务器收到租用请求后，将从地址池中为它提供一个尚未被分配出去的IP地址，并回应客户端。
+如果网络里不止有一个DHCP服务器回应，客户端通常只以第一个收到的为准。
+之后客户端会再次发送广播包来进行租用选择请求，告知服务器将使用的IP地址。
+最后，服务器发回应答包，确认将地址租用给客户端。
+
+为什么以广播的形式发送租用选择请求(第三个包)？
+在一个子网当中可能存在多台DHCP服务器，在租用IP地址的时候，可能会有多个DHCP服务器给客户端分配地址，
+当客户端确定使用哪一个地址之后，还需要通知给其他所有的dhcp服务器自己要使用的地址。
+其他的DHCP服务器收到以后，会对分配的地址进行回收。
+
+DHCP租期更新：
+IP租期期限到达50%时，DHCP客户端会以单播的形式发送请求(DHCP request)更新IP地址租约。
+IP租约期限到达87.5%时，DHCP客户端会认为原DHCP服务器不可用，以广播的形式发送请求(DHCP request)，如果还没收到服务器响应，会请求新的IP(DHCP discover)。
+如果DHCP客户端重新启动了，还有以前租用的IP，并且在有效期内，那么此时使用以前的IP。
+
+yum install dhcp -y		#安装dhcp
+cp /usr/share/doc/dhcp-4.2.5/dhcpd.conf.example /etc/dhcp/dhcpd.conf	#拷贝示例并覆盖配置文件
+vim /etc/dhcp/dhcpd.conf	#修改主配置文件
+全局配置：
+option domain-name "abc.com";				#连接特定的域名后缀
+option domain-name-servers DNS服务器的IP或域名(FQDN);		#指定DNS服务器
+default-lease-time 6000;	#默认租约时间
+max-lease-time 7200;		#最大租约时间
+单独子网配置：
+subnet 192.168.200.0 netmask 255.255.255.0 {
+	range 192.168.200.100 192.168.200.200;	#IP地址分配范围
+	option subnet-mask 255.255.255.0;		#指定子网掩码
+	option routers 192.168.200.254;		#指定默认网关
+	host myboss {				#给某一台主机分配固定的IP，myboss为自定义名字
+		hardware ethernet 00:00:00:00:00:00;	#MAC地址
+		fixed-address 192.168.200.100;	#保留地址
+	}
+}
+
+systemctl start dhcpd
+如果以上命令启动报错则查看日志
+tail -f /var/log/messages	#查看服务日志，-f:实时刷新
+vim快速注释所有行：%s/^/#
+
+查看占用端口：
+netstat -antulp | grep dhcp	#p:显示进程
+
+查看dhcp服务器地址分配情况：
+cat /var/lib/dhcpd/dhcpd.leases | less
+查看dhcp客户端租约历史：
+cat /var/lib/dhcpd/dhcpd.leases | less
+dhclient -r	#释放所有通过DHCP获取的IP
+dhclient		#重新获取IP地址
+
+假如有两台dhcp服务器，一台是192.168.200.200，另一台是192.168.200.201
+首先开启第一台dhcp服务器，主机开机或systemctl restart network之后租到一个192.168.200.100的地址，
+此时关闭第一台dhcp服务器，启动第二台dhcp服务器，主机再次重启网卡，发现现在192.168.200.100的地址租约没有到期，
+那么主机会发起续约请求，第二台dhcp服务器收到请求之后发现192.168.200.100在我的地址池之内，
+并且没有被占用，所以主机续约成功。最终导致了更换了dhcp服务器，主机还是租到了之前租约没有到期的地址。

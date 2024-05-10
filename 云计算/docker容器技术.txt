@@ -1,0 +1,117 @@
+docker属于操作系统层之上的进程隔离技术，它使用宿主机的linux内核，而不需要创建完整的linux系统。
+docker实际上也属于虚拟环境技术(类似python的虚拟环境)，不过它使虚拟环境更像是一个完全独立linux系统，而不需要共享宿主机的环境。
+而kvm是虚拟出一台完整的操作系统。docker比kvm更加节省系统资源，可以提供非常接近宿主机的性能。
+对比资料：https://www.cnblogs.com/MENGSHIYU/p/12101298.html
+
+安装docker容器服务：
+yum install -y docker
+安装device mapper，这是linux内核用来将块设备映射到虚拟块设备的框架(framework)
+yum install -y device-mapper-persistent-data
+启动docker服务并设置开机启动
+systemctl start docker;systemctl enable docker
+
+配置docker国内镜像源(需重启生效)：
+vim /etc/docker/daemon.json
+Docker中国区官方：
+{"registry-mirrors" : ["https://registry.docker-cn.com"]}
+中国科学技术大学ustc：
+{"registry-mirrors" : ["https://docker.mirrors.ustc.edu.cn"]}
+网易(使用http协议，速度应该会更快)：
+{"registry-mirrors" : ["http://hub-mirror.c.163.com"]}
+systemctl restart docker
+
+查看：
+docker info	#查看容器信息
+docker images	#查看镜像信息
+docker ps		#查看正在运行的容器 
+ps更多选项：
+-l		#查看最近运行的容器
+-a		#查看所有容器
+管理镜像(image)：
+镜像由"镜像名:版本号"组成，如果没有指明版本号,则默认为最新版本(latest)
+docker pull 镜像名或镜像url		#拉取网上镜像
+docker load < 本地路径		#读取本地镜像
+docker tag 镜像名 新镜像名:赋予新版本	#发布新镜像
+docker push 镜像名:版本号		#上传到docker仓库
+docker save -o 新镜像名 镜像名/镜像id	#保存镜像到宿主机，默认保存到当前目录
+docker rmi 镜像名/镜像id		#删除镜像
+管理容器(container)：
+容器带有id和容器名，都能唯一标识每一个容器，如果不指定容器名字将被系统随机赋予名字，容器的主机名默认为容器的id
+docker inspect 容器名/id		#查看容器的配置信息
+docker start 容器名/id		#启动关闭的容器
+docker stop 容器名/id		#关闭容器
+docker rm -fv 容器名/id		#删除容器，-f：强制关闭正在运行的容器后删除容器，-v：同时删除与它关联的匿名数据卷
+docker container prune		#清理所有终止运行的容器
+docker attach 容器名/id		#宿主机连接到容器
+docker port 容器名/id		#查看容器的端口映射
+docker cp 容器名:容器目录 本地目录	#复制容器里的目录或文件到本地
+docker logs -f 容器名/id		#查看容器运行的应用日志，-f：实时刷新
+docker create --name 容器名 镜像名/镜像id	#创建容器并指定容器名
+docker run -d 镜像名/镜像id 执行的命令		#使用镜像创建容器并执行命令，省略最后的命令则不执行任何命令，-d：执行命令后不返回结果，在后台运行
+run更多选项(仅对容器生效)：
+-d：后台运行容器并返回容器ID
+-P：随机选取宿主机的一个端口映射到容器默认开放的端口
+-p 宿主端口:容器端口	#把宿主机的所有地址(0.0.0.0)的指定端口映射到容器内
+-p 宿主端口:容器端口/udp	#映射udp端口，默认为tcp端口
+-p 宿主地址:宿主端口:容器端口	#指定宿主机的地址和端口映射到容器内
+-m 内存大小		#指定内存上限
+-w 本地目录		#指定工作目录，容器执行命令时，所在的目录
+-v 宿主目录:容器目录		#将本地目录挂载到容器，容器原目录则被隐藏
+-h 主机名			#指定主机名
+-e 变量名=值		#设置环境变量
+--rm 			#容器中的服务停止后自动删除容器，并删除与它关联的匿名数据卷
+--name 容器名		#指定名字
+--restart=always		#启动docker服务时自动启动该容器
+在已启动的容器中运行命令：
+docker exec -it 容器名/id	#登陆到容器
+exec更多选项：
+-i：以命令交互模式运行容器，通常与-t同时使用
+-t 容器名 shell解释器		#分配一个shell解释器，通常与-i同时使用
+-u 用户名			#指定登陆用户
+退出并停止容器：
+exit或按Ctrl+D
+退出不停止容器：
+先按Ctrl+P，再按Ctrl+Q
+
+管理数据卷(volume)：
+可以通过数据卷将容器内的数据保存到本地
+docker管理的数据卷保存在/var/lib/docker/volumes目录下
+docker volume create 卷名	#创建数据卷
+docker volume ls		#列出所有数据卷
+docker volume inspect 卷名	#查看数据卷的配置信息
+docker volume rm 卷名	#删除数据卷
+docker volume prune	#清理没有被挂载的数据卷
+挂载数据卷到容器：
+docker run --name 容器名 -dv 卷名:容器目录 镜像名/镜像id
+注：
+1.如果数据卷内没有文件，则容器目录上存在的文件会被保存到数据卷，如果数据卷存在文件，容器目录上的文件将被替换
+2.如果挂载了一个本地不存在的数据卷，将自动创建该数据卷
+3.匿名数据卷：
+	使用-v参数挂载目录时，如果没有指明宿主机的本地目录，
+	则会在本地的/var/lib/docker/volumes目录下创建一个匿名数据卷，
+	在删除容器时添加-v参数将删除匿名数据卷
+
+网络管理(network)：
+docker的网络模式有bridge、overlay、macvlan，默认为bridge(桥接)。
+由于内容太多，这三种网络模式的区别就不介绍了。
+列出网络配置：
+docker network ls
+创建网络配置：
+docker network create 网络名	
+更多选项：
+--driver bridge		#指定网络模式
+--subnet 192.168.1.0/24	#指定网络网段
+--gateway 192.168.1.1	#指定网关
+
+将多个容器加入到网络配置实现互联：
+docker run --name 容器名 -d --network 网络名 镜像名/镜像id
+或者
+docker run --name 容器名 -d --net=网络名 镜像名/镜像id
+多个容器间通过容器名来互联：
+docker run --name 容器名 -d --link 被连接容器名:别名(alias) 镜像名/镜像id
+通过docker ps命令可以看names字段里出现了"被连接容器名,主容器名/被连接容别名"，
+这说明主容器与被连接容器创建了虚拟通道(连接)，避免了被连接容器的网络暴露在宿主机上
+docker还将被连接的容器的hosts信息自动添加到主(父)容器的/etc/hosts文件里
+
+centos7最小化安装，启动docker时报错的解决方法：
+https://www.jianshu.com/p/45d158a45582

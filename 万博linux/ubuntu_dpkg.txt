@@ -1,0 +1,14 @@
+dpkg是Debian package的简写，为Debian操作系统专门开发的套件管理系统，类似rpm命令。
+用于软件的安装，更新和移除，dpkg软件包以deb结尾。
+所有源自"Debian"的Linux的发行版都使用 dpkg,   例如"Ubuntu"。
+
+命令格式：
+dpkg [参数] 软件包名.deb
+-i filename.deb	安装deb软件包
+-r filename.deb	移除软件(保留配置文件)
+-P filename.deb	完全移除软件(不保留配置文件)
+-L filename.deb	查询已安装的软件包所安装的位置以及配置文件(类似rpm -ql)
+-l		列出所有已安装的软件包信息
+
+举例
+dpkg -l | grep vim	#查找是否安装vim

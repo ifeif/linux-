@@ -1,0 +1,338 @@
+﻿#!/bin/bash
+#用于一键部署gpmall
+#前期准备
+setenforce 0
+systemctl stop firewalld
+
+#填写自己的IP地址
+HOSTIP=192.168.200.200
+
+
+#检查是否是root用户执行
+if [ $(id -u) != "0" ]; then
+    echo "Error: You must be root to run this script, please use root to install lnmp"
+    exit 1
+fi
+
+#配置基本环境
+install_init(){
+
+#配置主机名
+		#修改主机名为mall
+		hostnamectl set-hostname mall                                                            
+		#修改hosts文件，映射IP地址与主机名，若此处不做，启动kafka时会报错
+		cat >> /etc/hosts << EOF       
+$HOSTIP mall
+EOF
+#设置本地yum源
+		cd
+		#将gpmall-repo目录复制到/opt目录下
+		cp -rf /root/gpmall-repo /opt/
+		#将本机自带的repo文件移除
+		mv /etc/yum.repos.d/* /media                                                            
+
+		#创建本地local.repo文件，内容如下
+		cat > /etc/yum.repos.d/local.repo << EOF
+[gpmall]
+name=gpmall
+baseurl=file:///opt/gpmall-repo
+gpgcheck=0
+enabled=1
+
+EOF
+
+		yum install -y wget
+		wget http://mirrors.aliyun.com/repo/Centos-7.repo -O /etc/yum.repos.d/CentOS-Base.repo
+}
+
+
+#安装java环境
+install_java(){
+		#使用yum安装java环境
+		yum install -y java-1.8.0-openjdk java-1.8.0-openjdk-devel
+		#查看java版本
+		java -version
+		#检查java环境是否ok
+		#$? 获取上一个命令的退出状态
+		if [ $? -eq 0 ]
+        then
+               echo -e "\033[36m==========java环境安装成功==========\033[0m"
+          else
+               echo -e "\033[31m**********安装java环境失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+}
+
+#安装redis、nginx、数据库服务
+install_servers(){
+		#使用yum安装redis服务
+		yum install redis -y
+		#使用yum安装nginx服务
+		yum install nginx -y
+		#使用yum安装mariadb服务
+		yum install mariadb mariadb-server -y
+		#检查服务是否成功安装
+		if [ $? -eq 0 ]
+        then
+               echo -e "\033[36m==========redis、nginx、mariadb安装成功==========\033[0m"
+          else
+               echo -e "\033[31m**********安装环境失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+
+}
+
+#安装Zookeeper服务
+install_zookeeper(){
+		cd
+		#查看Zookeeper-3.4.14目录是否存在，不存在就解压Zookeeper的压缩包
+		[ ! -d zookeeper-3.4.14 ] && tar -zxf zookeeper-3.4.14.tar.gz
+		#进入Zookeeper的配置文件目录
+		cd zookeeper-3.4.14/conf
+		#将原来的模板配置文件改名
+		mv zoo_sample.cfg zoo.cfg
+		#进到Zookeeper的bin目录
+		cd ../bin
+		#启动Zookeeper服务
+		./zkServer.sh start
+		#检查Zookeeper服务是否正常启动
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========Zookeeper启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********Zookeeper启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2 
+}
+
+#安装kafka服务
+install_kafka(){
+		cd
+		#查看kafka目录是否存在，不存在就解压kafka压缩包
+		[ ! -d kafka_2.11-1.1.1 ] && tar -zxf kafka_2.11-1.1.1.tgz
+		#进入到kafka的bin目录
+		cd kafka_2.11-1.1.1/bin
+		#启动kafka服务
+		./kafka-server-start.sh -daemon ../config/server.properties
+		#检查是否成功启动
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========kafka启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********kafka启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+}
+
+#配置mariadb数据库并启动
+mariadb(){
+		cd
+		#在数据库的my.cnf文件添加内容如下
+		cat > /etc/my.cnf << EOF
+[mysqld]
+
+init_connect='SET collation_connection = utf8_unicode_ci'
+init_connect='SET NAMES utf8'
+character-set-server=utf8
+collation-server=utf8_unicode_ci
+skip-character-set-client-handshake
+		
+
+EOF
+		#启动数据库
+		systemctl start mariadb
+		#设置数据库root的密码为123456
+		mysqladmin -uroot password 123456
+		#赋予root用户本地和远程的权限
+		mysql -uroot -p123456 << EOF
+grant all privileges on *.* to root@mall identified by '123456' with grant option;
+grant all privileges on *.* to root@"%" identified by '123456' with grant option;
+EOF
+		#创建gpmall数据库，并将gpmall.sql文件导入
+		mysql -uroot -p123456 << EOF
+create database gpmall;
+use gpmall
+source /root/gpmall.sql
+EOF
+		#设置开机自启数据库
+		systemctl enable mariadb
+		#重启数据库服务
+		systemctl restart mariadb
+		#检查数据库是否重启成功
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========maridb启动成功=========\033[0m"
+          else
+               echo -e "\033[31m**********mariadb启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+}
+
+#配置redis服务并启动
+redis(){
+		cd
+		#修改redis的配置文件，将bind 127.0.0.1注释
+		sed -i 's/bind 127.0.0.1/#bind 127.0.0.1/g' /etc/redis.conf
+		#修改redis的配置文件，将protected-mode yes改为protected-mode no
+		sed -i 's/protected-mode yes/protected-mode no/g' /etc/redis.conf
+		#启动redis服务
+		systemctl start redis
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========redis启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********redis启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+		#设置开机自启
+		systemctl enable redis
+}
+
+#配置nginx并启动
+nginx(){
+		cd
+		#删除默认项目路径下的文件
+		rm -rf /usr/share/nginx/html/*
+		#将提供的dist静态文件复制到nginx项目目录
+		cp -rf /root/dist/* /usr/share/nginx/html
+		#修改nginx配置文件如下
+		cat > /etc/nginx/conf.d/default.conf << EOF
+server {
+    listen       80;
+    server_name  localhost;
+
+    #charset koi8-r;
+    #access_log  /var/log/nginx/host.access.log  main;
+
+    location / {
+        root   /usr/share/nginx/html;
+        index  index.html index.htm;
+    }
+
+    location /user {
+            proxy_pass http://127.0.0.1:8082;
+        }
+
+    location /shopping {
+            proxy_pass http://127.0.0.1:8081;
+        }
+
+    location /cashier {
+            proxy_pass http://127.0.0.1:8083;
+        }
+
+  error_page   500 502 503 504  /50x.html;
+    location = /50x.html {
+        root   /usr/share/nginx/html;
+    }
+
+}
+EOF
+		#启动nginx服务
+		systemctl start nginx
+		#检查nginx服务是否成功启动
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========nginx启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********nginx启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+		#设置nginx开机自启
+		systemctl enable nginx
+}
+
+start_jar(){
+		cd
+		#设置商城的全局hosts文件如下
+		cat >> /etc/hosts << EOF
+$HOSTIP kafka.mall
+$HOSTIP mysql.mall
+$HOSTIP redis.mall
+$HOSTIP zookeeper.mall
+EOF
+
+		#将之前设置的IP对应mall的那行删除
+		#删除第4行
+		#sed -i '4d' /etc/hosts
+		#重启数据库
+		systemctl restart mariadb
+		#在后台运行jar包，先运行两个provider的jar包，后运行两个gpmall的jar包
+		nohup java -jar shopping-provider-0.0.1-SNAPSHOT.jar &
+		sleep 5
+		nohup java -jar user-provider-0.0.1-SNAPSHOT.jar &
+		sleep 5
+		nohup java -jar gpmall-shopping-0.0.1-SNAPSHOT.jar &
+		sleep 5
+		nohup java -jar gpmall-user-0.0.1-SNAPSHOT.jar &
+		sleep 5
+		#检查jar包是否成功运行
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========jar包启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********jar包启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		 echo -e "\033[36m==========在浏览器访问您的IP==========\033[0m"
+
+}
+
+install_elasticsearch(){
+
+		yum install -y elasticsearch
+		cat > /etc/elasticsearch/elasticsearch.yml << EOF
+http.cors.enabled: true
+http.cors.allow-origin: "*"
+http.cors.allow-credentials: true
+cluster.name: my-application
+node.name: node-1
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+network.host: $HOSTIP
+http.port: 9200
+EOF
+		#启动elasticsearch服务
+		systemctl start elasticsearch
+		#检查elasticsearch服务是否成功启动
+		if [ $? -eq 0 ]
+        then
+               sleep 3
+               echo -e "\033[36m==========elasticsearch启动成功==========\033[0m"
+          else
+               echo -e "\033[31m**********elasticsearch启动失败，请检查**********\033[0m"
+			   exit 1
+        fi
+		sleep 2
+		#设置elasticsearch开机自启
+		systemctl enable elasticsearch
+}
+
+#运行脚本的入口，上面写的都是函数，下面为调用顺序
+install_init
+install_java
+install_elasticsearch
+install_servers
+install_zookeeper
+install_kafka
+mariadb
+redis
+nginx
+start_jar
+
+
+
+

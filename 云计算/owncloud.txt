@@ -1,0 +1,21 @@
+﻿ubuntu改中文
+sudo apt-get install  language-pack-zh-han*	# 安装中文语言包
+gedit /etc/default/locale	#修改语言配置文件
+LANG="zh_CN.UTF-8"
+
+参考资料：https://www.cnblogs.com/MineLSG/p/12663378.html
+
+
+ownCloud是一个开源免费的私有云存储服务，提供的图形化操作的网页基于PHP，帮你快速架设一台专属私有网盘服务器。
+create database if not exists owncloud;
+create user 'ownclouduser'@'localhost' identified by 'PASSWORD';
+grant all on owncloud.* to 'ownclouduser'@'localhost' identified by 'PASSWORD' with grant option;
+flush privileges;
+
+软件安装：
+sudo apt-get install apache2 libapache2-mod-php7.0 php7.0-gd php7.0-mysql php7.0-curl php7.0-intl php7.0-mcrypt php-imagick php7.0-zip php7.0-xml php7.0-mbstring
+
+登陆mysql：
+mysql -u用户名 -p密码 -h主机名或ip地址;
+退出mysql：
+quit或exit;

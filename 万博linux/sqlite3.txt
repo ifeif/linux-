@@ -1,0 +1,260 @@
+sqlite3是一个本地数据库软件。
+sqlite3 user.db	#创建数据库文件user.db,如果已存在则打开,对文件名的大小写不明感
+增：
+create table person(name text,passwd text);		#创建person表并添加表头
+insert into person values('root','123456'),('chen','123456');	#插入多行数据到person表
+删：
+delete from person where name='root';			#删除person表里位于表头name='root'的数据项
+改：
+update person set passwd='654321' where name='root';	#修改person表里表头passwd='654321'位于name='root'的数据项
+查：
+select * from person;				#从person表里选择所有表头进行查询
+其他操作：
+.quit
+.help
+.tables
+.database
+
+mysql是一个网络数据库软件。
+登陆mysql：
+mysql -u用户名 -p密码 -h主机名或ip地址;		#注意参数间不需要加空格
+退出mysql：
+quit或exit
+允许修改数据库：
+set sql_safe_updates=0 
+
+修改root用户密码：
+SET password=password('新密码');	#password函数对密码进行加密，并保存到password字段
+创建数据库管理用户并设置密码：
+create user chen@'%' identified by '123456';	#创建的数据库管理用户保存在名为mysql的数据库里
+赋予权限语句格式：
+grant 权限类型 on 数据库名.表名 to 用户名@允许连接的IP地址;
+给chen用户赋予所有数据库和所有表单的所有权限：
+grant all privileges on *.* to 'chen'@'%';			#all privileges表示所有权限，其中privileges可省略，%表示任何主机都能连接到mysql服务器
+grant all on *.* to 'root'@'%' with grant option;		#with grant option表示该用户可以给其他用户赋予权限(grant)
+回收权限：
+revoke all on *.* from 'root'@'%';
+修改root用户为任何主机可连接：
+update user set host='%' where user='root';
+flush privileges;        #刷新权限，使user表和privilige(权限)的修改加载到进程(内存)中生效
+查看所有用户的权限：
+show grants;
+参考资料：
+http://www.javashuo.com/article/p-nituzqsn-hk.html
+
+create database user;	#创建数据库
+
+show databases;		#显示所有数据库
+
+use user;			#使用数据库
+
+show tables;		#显示数据库中的所有表和视图
+
+create table if not exists person		#如果person表不存在则创建该表并添加表头，if not exists保证多次创建表时不会报错
+(name varchar(10),passwd varchar(10));		#varchar(10)：可变字节，根据数据的大小占用空间，最大可占用10字节
+
+describe person;或desc person；	#查看person表表头属性
+
+drop table if exists person;		#当这个表存在的话删除该表，if exists保证多次删除表时不会报错
+
+将数据库导出到sql文件：
+mysqldump -u用户名 -p密码  数据库名>文件名.sql
+如果要导出数据表可以这样写：数据库名 表名>文件名.sql
+导入到数据库：
+mysql -u用户名 -p密码  数据库名<文件名.sql
+或者在mysql命令里输入source 文件名.sql
+查询当前数据库系统使用的编码
+show variables like '%character%';
+设置数据库系统编码：
+set names utf8;
+
+select语句的语法格式：
+select {表头名 | 表达式}
+from 表名1 [,表名2,...]
+[where 条件表达式]				#从表里筛选
+[group by {表头名 | 表达式} [ASC | DESC,...]]	#对相同字段进行分组
+[having 条件表达式]				#对查询结果筛选
+[order by {表头名 | 表达式} [ASC | DESC,...]]	#对查询结果排序
+[limit {n,m | 行数 offest 偏移量}]		#边界限定,返回结果的n+1行到m行
+说明：
+[]内为可选项，可选多个或不选。
+{}内为必选项，只能选其中一个。
+
+选择多个表头用逗号分割：
+select 表头1,表头2,表头3
+
+临时修改显示的表头标题：
+select name 姓名
+或者
+select name as 姓名
+
+返回四舍五入后的值
+round(输入值,保留几位小数)
+第二个参数省略，则默认返回四舍五入后的整数
+
+统计行数：
+select count(*)
+
+去掉重复：
+select distinct name
+
+from：从哪个表格
+where：在哪一项数据
+模糊匹配：
+like可以当作一个运算符，相当于关键词匹配
+where name like '张%'	#匹配所以以张开头的字符
+%：匹配任意字符，包括空字符
+_：匹配任意单个字符
+
+逻辑表达式(一般用在where关键字之后)：
+where num between 15 and 25
+或者
+where num >=15 and num<=25
+
+选择区间：
+where num in {19,20,21}
+where num not in {19,20,21}
+或者
+where num=19 or num=20 or num=21
+where num!=19 and num!=20 and num!=21
+
+那么where num!=19 or num!=20 or num!=21是什么意思？
+整体看上去很复杂，那么可以从左往右开始看起
+or的意思是只要有一个为1，那么结果为1
+这个表达式的结果永远为1，为什么？
+因为把任何一个数带入到num，运算结果都为1
+
+从小到大排序(升序)：
+order by num asc(asc可以省略)
+从大到小排序(降序)：
+order by num desc
+排序优先级：
+order by 优先级1,优先级2,优先级3
+字符默认按照字符编码值大小排序
+中文要按照拼音排序则需要这样写：
+order by convert(StuName using gbk)
+
+having和where的区别：
+having是根据筛选出的结果再进行筛选，而where是从数据表中的字段直接进行的筛选的
+例如数据表里没有平均值字段，前面的查询求出了平均值，这时候只能用having，因为数据表里没有该字段。
+where不能和avg一起用
+
+将类别不同的数据分组统计，并求每组的平均分数：
+group by 类别
+having avg(分数)
+
+将相同的数据按照指定类别进行分组，并对分组的结果进行汇总：
+group by 类别 with rollup
+
+子查询(嵌套查询)：
+子查询返回多行数据的时候用"in"来筛选
+select * from Course where CouNo in (select CouNo from StuCou);
+子查询返回一行数据的时候用"="来筛选
+select * from StuCou where StuNo=(select StuNo from Student where StuName='甘蕾');
+
+多表连接(相同表头匹配，去除多余的数据)：
+select student.*,classname,departno
+from student,class
+where class.classno=student.classno
+等价于
+select student.*,classname,departno
+from student join class
+on class.classno=student.classno
+
+约束：
+定义主键(主键和外键不允许为空)：
+用来确定数据唯一性的一个表头，添加主键的同时系统自动添加该主键的引索
+方法一：
+	表头名 数据类型 not null primary key
+方法二：
+	表头名 数据类型 not null,
+	primary key(表头名)
+方法三：
+在修改表结构的时候增加主键
+当一个表头不能确定当前表数据的唯一性时，可以用两个表头的组合作为一个主键
+	alter table 表名
+	add primary key(表头名1，表头名2)	
+删除主键(删除主键约束之前需删除外键)：
+	alter table 表名
+	drop primary key;
+定义外键：
+另一个表的主键作为当前表的一个表头，这个表头就叫做外键，外键用于表示该表与另一张表的数据项的连接关系。
+	foreign key(表头名) references 参照的表名(参照的表头名)
+注：副表有外键约束的情况下，先添加主表主键的数据才能添加副表外键的数据
+可以(暂时)禁用外键约束检查直接给副表添加外键数据：
+	set foreign_key_checks=0;
+主键和外键示例：
+create table Class(
+ClassNo char(8) not null primary key,
+ClassName varchar(8) not null,
+DepartNo char(2) not null);
+
+create table Student(
+StuNo char(8) not null,
+Stu Name varchar(10) not null,
+ClassNo char(8) not null,
+Pwd varchar(8) not null,
+primary key(StuNo)
+foreign key(ClassNo) peferences Class(ClassNo));
+
+添加自定义默认值：
+	alter table 表名
+	alter 表头名 set default 默认值;
+删除自定义默认值：
+	alter table 表名
+	alter 表头名 drop default;
+自动填充向下递增的唯一编号(id)：
+auto_increment的作用：当填入该表头的数据为null时，系统会自动填充向下递增的唯一编号(id)
+注：primary key和auto_increment必须要一起使用，每个表只能有一个带auto_increment约束的表头，并且该表头的数据必须为整型
+当表头后面没有下一个表头时，null可以不填，所以通常将表里的最后一个表头设为auto_increment
+格式：
+	create table [if not exists] 表名(表头名 数据类型 primary key auto_increment);
+唯一约束：
+	该表头不允许出现重复的数据
+添加唯一约束：
+	alter table 表名 add unique 唯一约束名(表头名);
+删除唯一约束：
+	alter table 表名 drop index 唯一约束名;
+
+在某个表上增加表头：
+after用于指定在哪个表头后面增加表头
+	alter table 表名
+	add column 表头名 数据类型 after 上一个表头的表头名;
+
+给表头添加文字描述：
+	alter table 表名
+	alter 表头名 comment '描述内容';
+
+插入多行数据到指定表头：
+insert into 表名(表头名1,表头名2,表头名3) values
+(数据项11,数据项12,数据项13),
+(数据项21,数据项22,数据项23),
+(数据项31,数据项32,数据项33);
+
+修改指定表头的所有数据项：
+update 表名 set 表头名=修改后的内容;
+删除表中的所有数据项：
+delete from 表名;
+
+索引：
+	索引类似一本书的目录，通过索引，计算机在查询数据时不用读完记录的所有信息，而只是查询索引列。
+	当被索引的内容唯一时，可以加上unique关键字。
+创建索引：
+	alter table 表名 add [unique] index 索引名(表头名);
+	或
+	create [unique] index 索引名 on 表名(表头名);
+删除索引：
+	alter table 表名 drop index 索引名;
+视图：
+	视图相当于在已有表的基础上筛选有用的数据创建新的视图表，以便查询常用信息
+创建视图：
+	create view 视图名 as select 表头名 from 表名 where 表头名=数据项;
+查询视图：
+	select * from 视图名;
+删除视图：
+	drop view 视图名;
+
+原子性：
+	指一个操作能否在一条cpu指令中执行完成。
+事务：
+	一个事务的操作是不可分割的，要么都发生，要么都不发生。

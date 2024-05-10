@@ -1,0 +1,197 @@
+系统管理
+1.新建组帐号：新建一个组群HR，完成后使用cat /etc/group|grep HR命令查看结果,将显示内容以文件名1-1.jpg保存到考试文件夹  
+groupadd HR 
+cat /etc/group|grep HR
+2.新建用户账号: 新建一个用户账号jerry，设置密码为jerry123，加入到HR组群,使用jerry登录查看结果，将显示内容以文件名1-2.jpg保存到考试文件夹
+useradd -g HR jerry
+passwd jerry
+su jerry
+3.创建文件：在/tmp目录下创建文件wnt公司员工名单，将该文件的拥有者改为jerry, 该文件的权限改为拥有者可读写，其它人不可读写. 使用ls -al /tmp/wnt公司员工名单 ,将显示结果以文件名1-3.jpg保存到考试文件夹
+cd /tmp
+touch wnt公司员工名单
+chown jerry wnt公司员工名单
+chmod u+rwx wnt公司员工名单
+chmod g-rwx wnt公司员工名单
+chmod o-rwx wnt公司员工名单
+ls – al /tmp/ wnt公司员工名单
+4.Vi使用：打开文件wnt公司员工名单，使用Vi写入以下内容：
+部门   员工
+IT     tom 
+HR   jerry
+完成后保存退出，使用cat wnt公司员工名单后将显示结果截图，以文件名1-4.jpg保存到考试文件夹
+vi wnt公司员工名单
+进行编辑后退出
+cat wnt公司员工名单
+5.通配符练习:在/tmp目录下创建一个名为2000-2018的文件夹，在该文件夹中以格式 年-月创建从	2000年到2018年的目录，完成后使用ls 20* | wc – l 显示结果截图，以文件名1-5.jpg保存到	考试文件夹
+cd /tmp
+mkdir  2000-2018
+mkdir {2000..2018}-{1..12}
+ls 20* | wc - l
+6.新建分区：在/dev/sdb上新建一个分区，分区的容量为5G，格式为Ext4, 新建一个文件夹名为test,将分区/dev/sdb1挂载到该文件夹，使用df -h将显示结果以文件名1-6.jpg保存到考试文件夹
+添加硬盘2
+fdisk /dev/sdb
+n
+p
+1
+Enter
++5G
+w
+lsblk
+mkfs.ext4 /dev/sdb1
+mkdir /test
+mount /dev/sdb1 /test
+df -h
+7.系统启动时自动挂载：修改/etc/fstab，保证/dev/sdb1在系统重启后自动挂载到/test。完成后重启系统，使用df –h 命令查看，将显示结果截图以文件名1-7.jpg保存到考试文件夹.
+vim etc/fstab
+底部内容如下
+/dev/sdb1     /test      ext4   defaults       0 0
+df -h
+8.压缩软件：使用tar将/tmp目录打包压缩名字为tmp.tar.gz，完成后使用ls |grep tmp.tar.gz，将显示内容截图以文件名1-8.jpg保存到考试文件夹.
+tar –czf /tmp.tar.gz /tmp
+ls|grep tmp.tar.gz
+9. 软件安装：将vnc.iso挂载mnt并安装其中的软件,完成后使用rpm –qa |grep vnc查看结果,将显示内容截图以文件名1-9.jpg保存到考试文件夹.
+mount /dev/sr0 /mnt
+cd /mnt
+rpm –ivh 软件
+rpm –qa |grep vnc
+10.软件卸载：将软件nano卸载，完成后使用rpm -qa |grep nano查看结果，将显示内容截图以文件名1-10.jpg保存到考试文件夹.
+rpm –e nano
+rpm -qa |grep nano
+二.网络管理
+1. 修改主机名:将Linux主机修改为你的名字拼音确保系统重启后继续有效。完成后重启，使用“hostname”,将显示的结果截图以文件名2-1.jpg保存到考试文件夹.
+setup
+网络配置
+DNS配置
+修改主机名第一行
+2. 修改IP：将Linux主机的IP修改为192.168.x.200（x为你的学号）保证系统重启后继续有效，完成后重启，使用 “ifconfig eth0” 将显示的结果截图以文件夹名2-2.jpg保存到考试文件夹.
+ifconfig 网卡号 IP地址+掩码
+输入ip，用空格将DHCP*号删除
+3. 远程登录：启动Linux的远程登录，使用软件Putty远程登录到Linux系统的文字界面，完成后将登录界面截图以文件名2-3.jpg保存到考试文件夹
+在WIN7设置DNS为Linux IP      ip 为Linux同网段的IP地址
+虚拟机网络设置为VMware1 （仅主机模式）
+service sshd start
+4.配置DNS服务并完成以下实验要求:
+ 	A. 创建两个正向查询区:wnt.com、good.com
+		在wnt.com区域创建两条A记录（NS、A）分别指向Linux服务器.
+		在good.com区域创建两条A记录（NS、A）分别指向Linux服务器.
+	B.正常启动named服务,并确保系统重启后named服务自动启动.
+	C.在win7使用nslookup正常查询www.wnt.com和www.good.com,将两次查询结果截图	    并分别为2-4.jpg和2-5.jpg保持到考试文件夹.
+vim /etc/named.conf
+在11行和17行将127.0.0.1 和 localhost修改为any
+在40行下面添加下列配置
+zone “wnt.com” IN  {
+                type master;
+                 file “wnt.com”
+};
+zone “good.com” IN  {
+                type master;
+                 file “good.com”
+};
+配置完成后退出
+cd /var/named 
+cp -p named.localhost wnt.com
+cp -p named.localhost good.com
+vim   /var/named/wnt.com
+编辑如下：
+                NS    ns.wnt.com.
+ns              A     LinuxIP地址
+www             A     LinuxIP地址
+vim /var/named/good.com
+编辑如下：
+                NS    ns.good.com.
+ns              A     LinuxIP地址
+www             A     LinuxIP地址
+service  named  start
+chkconfig named  on
+在WIN7测试
+5.配置Http服务器并完成以下实验要求:
+    A. 创建两个虚拟主机网站:wnt.com、good.com
+    		wnt网站的首页内容: welcome to wnt website
+   		good网站的首页内容: welcome to good website
+		wnt网站首页文件夹是/www/wnt/
+		good网站首页文件夹是/www/good/
+    B.正常启动httpd服务,并确保系统重启后httpd服务自动启动.
+    C.在win7使用IE打开www.wnt.com和www.good.com可显示网站内容,将两个网站内容             	截图并分别为2-6.jpg和2-7.jpg保持到考试文件夹
+
+vim /etc/httpd/conf/httpd.conf
+990行NameVirtualHost 192.168.x.200:80(记得消除*号)
+在文件底部修改
+<VirtualHost 192.168.x.200:80>
+             ServerAdmin root@wnt.com
+             DocumentRoot /www/wnt
+             ServerName www.wnt.com
+                <Directory /www/wnt>
+                </Directory>
+     </VirtualHost>
+<VirtualHost 192.168.x.200>
+             ServerAdmin root@good.com
+             DocumentRoot /www/good
+             ServerName www.good.com
+                <Directory /www/good/>
+                </Directory>
+     </VirtualHost>
+mkdir -p /www/wnt
+mkdir -p /www/good
+ echo “welcome to wnt” > /www/wnt/index.html
+ echo  “welcome to good”>  /www/good/index.html
+service httpd start
+chkconfig httpd  on
+3.配置FTP服务器并完成以下实验要求:
+	A.启动匿名用户上传功能，并上传你的名字的TXT文件，截图以2-8.jpg保持到考试文件夹.
+	B.启动本地用户登录，使用jerry可以登录到FTP，并上传名为jerry的txt，截图以2-9.jpg保持到考试文件夹.
+	C.该服务要求设置为开机启动.
+A.
+vim /etc/vsftpd/vsftpd.conf
+修改27和31行
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+chmod o+w /var/ftp/pub
+service vsftpd start
+在WIN7上传你的名字的TXT文件
+B.
+service vsftpd restart
+在WIN7上传名为jerry的txt
+C.
+chkconfig vsftpd on
+4.配置SMB服务器并完成以下实验要求:
+	A.共享/tmp目录、允许任意写入，在win7上打开上传一个你的名字的txt文件，截图以2-10.jpg保持到考试文件夹.
+	B.共享/home/jerry目录，只允许jerrry用户登录、写入，在win7上打开上传一个名为jerry的txt文件，截图以2-11.jpg保持到考试文件夹.
+	C.该服务要求设置为开机启动.
+A.
+vim /etc/samba/smb.conf
+将101行安全级别修改为share
+增加中文编码
+unix charset = utf8
+display charset = utf8
+dos charset       =gb2312
+底部添加
+comment = “临时共享文件夹”
+path = /tmp
+writable =   yes
+browseable = yes
+guest ok =  yes
+测试配置文件   testparm
+service smb start
+service nmb start
+使用win7测试并创建一个txt文件，txt文件名=姓名+组号
+B.
+修改安全级别为user
+底部添加
+comment = “jerry用户测试目录
+path = /home/jerry/test
+browseable = no
+writable =   yes
+write list   = jerry
+创建SMB服务用户Pdbedit – a –u jerry
+mkdir /home/jerry/test
+chmod 777 /home/jerry/test
+service smb start
+使用win7测试并创建一个jerry的测试文件
+chkconfig smb on
+chkconfig nmb on
+5.检查所有服务开机启动情况
+	A.使用ntsysv查看所有服务启动情况.
+A.
+ntsvsv
+
+

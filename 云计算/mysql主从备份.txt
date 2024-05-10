@@ -1,0 +1,52 @@
+MariaDB数据库管理系统是MySQL的一个分支，主要由开源社区在维护。
+开发这个分支的原因之一是甲骨文公司收购了MySQL后，有将MySQL闭源的潜在风险， 因此社区采用分支的方式来避开这个风险。
+MariaDB的目的是完全兼容MySQL，包括API和命令行，使之可以成为MySQL的代替品。 
+在存储引擎上，从10.0.9版起使用XtraDB来代替MySQL的InnoDB。 
+MariaDB由MySQL的创始人麦克尔主导开发，他早前曾将自己创建的公司MySQL AB卖给了SUN公司，此后，随着SUN被甲骨文收购。
+
+db1为主服务器
+db2为备份服务器
+vim /etc/hosts
+192.168.200.主机号 db1
+192.168.200.主机号 db2
+
+yum install mariadb-server -y
+systemctl start mariadb	#启动mariadb服务
+mysql_secure_installation	#mysql初始配置工具
+或者直接
+mysqladmin -uroot password 123456	#设置root密码
+vim /etc/my.cnf		#修改配置文件
+[mysqld]
+log_bin=mysql-bin
+binlog_ignore_db=mysql
+server_id=主机号
+
+
+systemctl restart mariadb	#重新加载配置文件
+systemctl enable mariadb	#开机启动
+
+db1
+mysql -uroot -p123456 
+grant all privileges on *.* to root@'%' identified by '123456'; 
+grant replication slave on *.* to 'user'@'db2' identified by '123456';
+
+
+db2
+mysql -uroot -p123456 
+change master to master_host='db1',master_user='user',master_password='123456';
+start slave;
+show slave status\G;
+
+在db1上创建数据：
+create database test;
+use test;
+create table company(id int not null primary key,name varchar(50),addr varchar(255));
+insert into company values(1,'facebook','usa');
+select * from company;
+
+在db2上查询数据：
+show databases;
+use test;
+select * from company;
+可以看到db2同步了db1添加的数据
+这样就完成了主从备份

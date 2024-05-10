@@ -1,0 +1,93 @@
+网络唤醒(Wake-on-LAN，WOL)：
+是一种计算机局域网唤醒技术，使局域网内处于关机或休眠状态的计算机，
+将状态转换成引导（Boot Loader）或运行状态。
+如果设备网卡接收到一个与自己 MAC 地址相同的幻数据包，
+则网卡会向计算机的主板发出信号以唤醒计算机。
+
+幻数据包的发送方式：
+(一)单播方式
+选择单播方式进行幻数据包发送，必须经过路由器的批准，在路由器进行ARP设置，
+绑定目标网卡的IP与MAC，这样才能把幻数据包发送到目标网卡上
+此开机方式不受防火墙阻挡，适用于穿越内网。
+(二)广播方式
+选择广播方式进行幻数据包发送，不需要进行路由ARP绑定；
+幻数据包到达路由器时，路由器不管目标是否开机，
+均采用广播方式发送幻数据包，从而实现远程开机。
+此开机方式受防火墙阻挡，适用于内网。
+
+电脑通过无线WIFi接入网络的话能够实现网络唤醒吗？
+答案是不可以的，因为要实现网络唤醒的一个重要的原因是，
+当我们的计算机关闭的时候，网卡要保持通电运作的一种特殊状态才能够接收到幻数据包。
+所以目前在计算机关机后继续能“运作”的无线网卡很难找到。
+
+网络唤醒的局限性：
+它只能在局域网中应用，而不能通过互联网运行，因为机器关闭后，完全是靠网卡唤醒机器，此时的机器是关闭的，
+没有操作系统运行，也就谈不上支持TCP/IP协议，当然也就不能通过互联网运行了。
+也就是说，如果在某个局域网中只有一台机器，就不能使用此功能了。
+另外必须能登录到局域网中的一台机器上，在此机器上运行Wake On LAN去唤醒目标机器，
+前提条件就是目标机器和登录的机器在同一局域网中。
+
+通过技术手段解除局限性：
+1.实现外网唤醒内网主机，首先要确保你的路由器有独立公网IP，
+由于IPV4 地址数量紧张，公网ip地址都是运营商动态分配的，
+可以配置动态域名服务(ddns)，将域名动态解析到你的公网IP上，
+2.设置端口转发，端口随便开一个就行（但是不要用运营商封禁的端口）
+另外协议类型选择UDP或者ALL！！因为唤醒数据包是通过UDP协议发送的，
+所以协议类型只选择TCP协议的话 数据包是进入不了内网的！！
+3.设置IP与MAC绑定，要唤醒的主机关机的时候是没有IP地址的，
+设置MAC绑定主要是让数据包可以通过转发规则发送到内网，
+路由器会自动记录每个内网口对应主机的MAC地址，
+当数据包通过端口转发到内网的时候，路由器会根据IP与MAC绑定，
+将数据包发送到内网对应MAC地址的接口
+
+前期准备：
+网络唤醒需要设置主板bios，并且网卡开启网络唤醒功能。
+BIOS设置：
+Wake On Lan模式可以在完全关机状态下唤醒
+Wake On PCI Card模式可以在深度休眠状态下唤醒
+
+linux唤醒其他主机的工具：
+centos：
+yum install epel-release	#安装第三方yum源
+yum install -y wol		#安装wol工具
+wol 目的主机MAC地址
+ubuntu：
+sudo apt-get install wakeonlan	#安装wakeonlan工具
+wakeonlan 目的主机MAC地址
+
+查看主机网卡是否开启网络唤醒：
+ethtool 网卡名
+Wake-on: g	#d表示禁用，g表示响应magic packet的唤醒
+
+配置网卡唤醒服务：
+window系统：
+打开设备管理器，找到网卡的属性，
+在高级面板把关机网络唤醒和魔术封包唤醒设置为开启，
+在电源管理面板开启允许此设备唤醒计算机。
+
+centos系统：
+yum install -y ethtool
+echo ETHTOOL_OPTS="wol g" > /etc/sysconfig/network-scripts/ifcfg-eth0
+
+ubuntu系统：
+#请输入网卡名
+ETH=eth0
+
+#安装网卡唤醒工具包
+apt install -y ethtool
+
+cat > /etc/systemd/system/wol.service << EOF
+[Unit]
+Description=Configure Wake On LAN
+[Service]
+Type=oneshot
+ExecStart=/sbin/ethtool -s $ETH wol g
+[Install]
+WantedBy=basic.target
+EOF
+systemctl daemon-reload
+systemctl enable wol
+systemctl start wol
+
+参考资料：
+https://www.jianshu.com/p/ab560a9d22a2?ivk_sa=1024320u

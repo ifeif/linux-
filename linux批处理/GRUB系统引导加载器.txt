@@ -1,0 +1,65 @@
+GRand Unified Bootloader:
+GRUB是一款与操作系统无关的系统引导装载器 ，提供了交互操作界面和命令行界面，现在所使用的GRUB为最新版本的GRUB2。
+GRUB的启动引导程序保存在MBR分区表的第一个扇区/GPT分区表的ESP分区，内核和grub的配置文件保存在linux发行版的/boot目录下。
+
+当安装一个linux发行版时，会自动安装grub，grub在安装时会查找所有磁盘分区的其他操作系统和/boot目录下已安装的linux内核，并将它们添加到grub启动菜单。
+grub2-install	#如果grub出现故障或添加其他操作系统到启动菜单，可重新安装grub
+(ubuntu/debian系统：sudo grub-install)
+
+GRUB在加载(启动)时会读取其配置文件：
+对于BIOS固件系统引导GRUB：/boot/grub2/grub.cfg，还有个软链接/etc/grub2.cfg
+对于UEFI固件系统引导GRUB：/boot/EFI/redhat/grub2/grub.cfg
+该配置文件不建议手工编辑，而由grub2-mkconfig工具根据系统信息生成的，生成时会参考：
+	位于/boot目录中的kernel和initramfs文件
+	位于/etc/default/grub的自定义设置文件
+	位于/etc/grub.d/目录下的模板文件
+
+vim /etc/default/grub	#一般都是编辑该文件
+grub2-mkconfig -o /boot/grub2/grub.cfg	#生成grub的配置文件
+或者
+grub2-mkconfig >/boot/grub2/grub.cfg	#生成grub的配置文件
+(ubuntu/debian系统：sudo update-grub)
+生成grub时会在命令行显示在/boot目录下找到的linux内核和在所有磁盘分区找到的其他操作系统。
+
+centos默认有2个grub启动项，第一个是正常启动项，第二个是修复启动项(linux出现故障时使用)。
+如果你升级了linux内核，旧的内核不会被自动删除，grub的启动菜单会多出来旧版本内核的启动项
+yum update kernel			#升级到最新的linux内核
+yum remove kernel-内核版本		#手动删除旧的linux内核
+
+在开机引导grup时：
+按e临时编辑GRUB现有配置
+按c 进入GRUB的命令行模式：
+	启动 grub.conf 中没有配置的其他操作系统
+	显示系统信息
+	按 TAB 查看可用的命令
+
+部分配置介绍：
+vim /etc/grub2.cfg
+set timeout=0	#等待时间0秒直接启动操作系统，如果设为-1一直等待(必须本机操作，不能远程)
+set default=0	#默认引导的操作系统，0表示第一个，1表示第2个，以此类推。
+
+超级用户口令丢失：
+若超级用户口令丢失，可以为内核传递参数rd.break中断启动过程，重新设置root口令
+在开机引导grup时按e编辑grup引导配置
+在linux16一行的末尾添加rd.break，给内核传递rd.break参数(rd=ramdisk)
+或者进入单用户模式，在linux16一行中：删除ro字段，在末尾添加rw init=/bin/sh
+按ctrl-x引导系统，然后系统会提供一个无需root口令登录的调试shell
+(用于临时调试的mini系统，并且有自己的根目录，默认以只读挂载原系统盘到/sysroot目录)
+
+LANG=en		#切换英文命令，防止乱码，不修改也行
+(单用户模式不需要重新挂载根)
+mount -o remount,rw /sysroot	#重新挂载原系统盘为读写状态
+chroot /sysroot			#切换根环境(创建子shell)
+passwd				#修改root密码
+(执行exec /sbin/init可退出单用户模式)
+exit
+exit
+如果系统之前开启了selinux，那么上面的密码修改无效
+有2种方法解决这个问题：
+1.修改密码之后输入这条命令：
+	touch /.autorelabel
+2.在引导的时候关闭selinux：
+	在linux16一行的末尾添加 rd.break selinux=0
+	之后再修改密码就可以生效
+
+

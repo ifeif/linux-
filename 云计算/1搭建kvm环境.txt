@@ -1,0 +1,69 @@
+kvm:
+Virtual Machine Manager
+
+sudo apt install qemu-kvm qemu virt-manager virt-viewer bridge-utils -y
+sudo apt install net-tools
+sudo init 6
+sudo ifconfig virbr0 10.10.1.100		#设置虚拟网桥地址
+
+sudo passwd root
+sudo apt install openssh* -y
+sudo gedit /etc/ssh/sshd_config
+34 PermitRootLogin prohibit-password
+58 PasswordAuthentication yes
+sudo systemctl restart sshd
+
+scp命令可在win10执行:
+scp centos7.qcow2 chen@192.168.229.128:/home/chen
+将centos7.qcow2镜像文件导入虚拟机，在镜像里选择centos7系统
+复制centos7.qcow2镜像文件再次导入虚拟机，在镜像里选择centos7系统
+两台主机的网络都桥接到virbr0虚拟三层 交换机中
+centos7网卡配置如下：
+DEVICE=eth0
+ONBOOT=yes
+BOOTPROTO=static
+IPADDR=10.10.1.200
+PREFIX=24
+GATEWAY=10.10.1.1
+DNS1=10.10.1.1
+DNS2=8.8.8.8
+ZONE=public
+===========================================================
+在两台主机里配置yum软件仓库：
+sudo apt install rar -y
+sudo rar x rpms.rar
+scp -r rpms root@10.10.1.200:/root
+scp -r rpms root@10.10.1.201:/root
+
+第一台主机命名为chain-a，ip为10.10.1.200：
+cd /etc/yum.repos.d/
+mkdir bak
+mv *.repo bak
+vi local.repo
+[local]
+name=local
+baseurl=file:///root/rpms
+gpgcheck=0
+enable=1
+
+yum repolist
+yum install -y vsftpd
+systemctl restart vsftpd	#启动ftp服务，restart也可以启动
+systemctl enable vsftpd
+firewall-cmd --add-service=ftp --zone=public --permanent
+firewall-cmd --reload
+cd
+cp -r rpms /var/ftp/pub
+ls /var/ftp/pub
+
+第二台主机命名为chain-b，ip为10.10.1.201：
+cd /etc/yum.repos.d/
+rm -rf *.repo
+vi ftp.repo
+[ftp]
+name=ftp
+baseurl=ftp://10.10.1.200/pub/rpms
+gpgcheck=0
+enable=1
+
+yum repolist

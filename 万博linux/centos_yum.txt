@@ -1,0 +1,178 @@
+﻿快速更改阿里yum源：
+	yum install -y wget
+	wget http://mirrors.aliyun.com/repo/Centos-7.repo -O /etc/yum.repos.d/CentOS-Base.repo
+	#-O：指定目录并重命名(替换重名文件)
+	yum clean all && yum makecache
+快速安装python3：
+Python2.7.5是CentOS 7默认安装的版本;
+Python3.6.8是CentOS 7中可以通过默认repo安装到的最新版本；
+yum源是支持安装python3，也会安装依赖包pip3，linux原生支持执行python2脚本，所以不支持卸载python2
+	yum install -y python3
+查看python3版本：
+	python3 -V
+python更新模块包：
+	pip3 install -U 包名
+	或python3 -m pip install --upgrade pip	#一般用来更新pip
+快速更改阿里pip源：
+	mkdir ~/.pip && vim ~/.pip/pip.conf
+	[global]
+	index-url=https://mirrors.aliyun.com/pypi/simple
+最新版python3安装教程：
+https://blog.csdn.net/zltliqi/article/details/126449120
+一键卸载所有python模块包：
+pip freeze > python_modules;pip uninstall -yr python_modules
+yum	#基于RPM的软件包管理器
+####################################
+基本操作
+-y	#忽略确认提示
+install	#安装，连同其所有依赖包一并安装到本机。当软件包已安装时会检查更新，相当于update
+update	#更新，不跟上软件包名则更新所有软件包
+remove	#卸载，该软件包上的相关依赖包并不会被移除
+reinstall	#重新安装
+autoremove	#连同该软件包的相关依赖包一并移除，不跟上软件包名则自动清理所有不需要的依赖包
+####################################
+查询操作
+info	#查看软件包的详细信息
+list	#列出已安装和可安装的软件包
+deplist	#列出软件包的依赖
+search	#搜索已安装的软件
+repolist	#列出已启用的yum源标识
+repolist all	#列出所有yum源标识(包括已禁用)
+list available	#列出可安装的软件包
+list installed	#列出已安装的软件包
+check-update	#检查是否有可更新的软件
+####################################
+缓存操作
+yum clean {all | packages | headers}
+all	#清理所有缓存
+package	#清理已下载的软件包
+headers	#清理所有下载的依赖信息缓存
+yum makecache	#构建缓存
+####################################
+yum配置文件：
+/etc/yum.conf：为所有仓库提供公共配置
+/etc/yum.repos.d/*.repo：为仓库的指向提供配置
+yum是用来管理rpm的，就跟maven管理jar包相似。yum源(库)分为本地库、网络库。首先要配置yum源，可支持多个源。
+/etc/yum.repos.d/目录下存放.repo文件
+CentOS自带了几个repo文件
+CentOS-Base.repo 是yum网络源的配置文件
+CentOS-Media.repo 是yum本地源的配置文件
+备注：
+yum会读取/etc/yum.repos.d目录下所有repo文件，所以该目录不能有错误的repo文件
+yum会先在网络源中寻找适合的包，之后再从本地源中寻找。当没有网络源的配置文件时,直接从本地源读取。
+
+什么是repo文件？
+repo文件定义yum源(软件仓库)的配置信息，通常一个repo文件定义了一个或者多个软件仓库的细节内容。
+[name]	#软件源标识
+name=名字	#软件仓库的名字
+baseurl=file:///mnt	#软件源url，[本地目录ftp://][网络http://] file://绝对路径
+enabled=1	#是否启用该软件源
+gpgcheck=1	#是否校验软件包
+gpgkey=校验码url	#和上面的参数同时启用
+
+
+配置阿里云yum源：
+1.首先备份自己的网络源配置文件
+cd /etc/yum.repos.d/
+cp CentOS-Base.repo CentOS-Base.repo.bak
+
+2.下载阿里云的CentOS-Base.repo配置文件到/etc/yum.repos.d/
+cd /etc/yum.repos.d/
+wget http://mirrors.aliyun.com/repo/Centos-7.repo
+mv Centos-7.repo CentOS-Base.repo
+3.重新生成缓存
+yum clean all
+yum makecache
+
+在线下载：
+什么是wget：
+wget是Linux中的一个下载文件的工具，默认下载到当前目录。
+支持通过HTTP、HTTPS、FTP三个最常见的TCP/IP协议下载。
+wget名称的由来是"World Wide Web"与"get"的结合。
+命令格式：
+wget -选项 url地址
+更多选项：
+-O：指定下载目录并重命名文件(替换重名文件)
+-c：继续下载上次下载中断的文件
+-r：下载整个网站目录
+-b：后台下载
+-i：从文件中读取下载地址进行批量下载(每行一个)
+什么是curl：
+curl意思是cp url，将url地址的网页内容拷贝下来输出到命令行。
+一般下载文件使用wget，获取url的内容使用curl。
+命令格式：
+curl -选项 url地址
+更多选项：
+-L：允许url自动跳转
+-I：只获取HTTP-header(http请求头)
+-O：如果url内容是一个文件，则将文件保存到当前目录
+-o 文件名：将获取到的内容输出到文件
+-x：指定代理服务器的地址和端口
+第三方yum源：
+centos官方源里的软件版本普遍很低，虽然基础软件得到长期安全支持。
+但有时没法满足需求。若要安装新版本软件，可以通过第三方软件源安装。
+
+EPEL+IUS源：
+前者补充默认源里没有的软件，后者用于安装需要新版本的软件。
+IUS源和EPEL存在依赖关系，添加IUS前需要启用EPEL源。
+
+EPEL全称叫Extra Packages for Enterprise Linux，由Fedora社区打造，
+为RHEL及衍生发行版如centos、scientific linux等提供高质量软件包的项目。
+装上EPEL之后就相当于添加一个新的第三方软件源。
+安装EPEL软件源
+yum install -y epel-release	#相当于在/etc/yum.repos.d/目录下添加一个软件源
+IUS也是一个社区维护的软件源，全名是Inline with Upstream Stable。
+安装IUS软件源：
+国外：
+yum -y install https://centos7.iuscommunity.org/ius-release.rpm
+国内：
+yum -y install https://mirrors.aliyun.com/ius/ius-release-el7.rpm
+
+默认源里的软件名不带版本号，IUS源带有额外的版本号
+如果只想搜索IUS源里的软件，不同时搜索其它软件源，用下面命令：
+yum --disablerepo="*" --enablerepo="ius" search 关键词		#临时禁用所有源，激活ius源，再进行搜索
+
+如果要更新为不同来源的软件包，需要先移除低版本再安装新版本，否则安装时会报错
+由于第三方源软件包的名字跟默认源不同，所以不能用yum update来更新软件包，不过可以使用插件
+yum install yum-plugin-replace	#yum plugin replace插件能够一键更新为第三方源的软件包
+yum replace 旧包名 --replace-with 新包名
+
+部分介绍:
+yum install yum-utils		#yum-utils是提供查询软件包配置文件的目录的工具，包含一系列实用程序
+repoquery -q -l <包名>		#查看软件包的所有文件目录
+yum-config-manager --add-repo 第三方yum源地址	#添加第三方yum源
+yum-config-manager --enable 仓库名			#启用指定仓库
+yum-config-manager --disable 仓库名			#禁用指定仓库
+yum-complete-transaction –cleanup-only		#清理未完成的事务(yum进程)
+package-cleanup --problems				#列出有依赖问题的软件包
+package-cleanup --cleandupes			#清理旧版本的重复包
+package-cleanup --oldkernels				#清理旧的内核文件
+yum update kernel			#更新linux系统内核，已安装的内核保存在/boot目录下
+
+主配置文件路径 /etc/yum.conf 
+[main]
+cachedir=/var/cache/yum/$basearch/$releasever    #下载RPM包的缓存目录
+keepcache=0		#RPM缓存的程序包安装完成后是否保存，0表示不保存，1表示保存
+debuglevel=2		#调试级别 取值范围 0 – 10，默认值为2
+logfile=/var/log/yum.log	#yum相关日志存放路径
+exactarch=1		#是否要平台完全匹配才能安装
+obsoletes=1		#需不需要检查已过期的仓库
+gpgcheck=1		#是否检查包的完整性和合法性
+plugins=1		#是否允许支持yum的插件功能，0 表示不允许 ，1表示允许
+installonly_limit=5		#允许保留多少个内核包
+
+软件包组：
+yum默认自带了一些软件包组，可以一次性安装一组软件
+yum grouplist		#列出所有可用的安装包组
+yum groupinstall 包组名	#安装包组中的所有软件
+yum groupremove 包组命	#卸载包组中的所有软件
+常用的软件包组：
+"Development Tools"	#开发环境
+"GNOME Desktop"		#桌面环境
+fonts			#语言包(包含中文字体)
+如何将系统语言永久设为中文？
+localectl list-locales		#列出可用的语言包
+localectl set-locale LANG=zh_CN.utf8	#{语言代号}_{国家代号}.{字符集}
+参考资料：
+http://www.178linux.com/40266
+https://www.cnblogs.com/vathe/p/6736094.html

@@ -1,0 +1,45 @@
+VMTools安装镜像位置：在VMWare安装目录中找到 C:\Program Files (x86)\vmware\VMware Workstation\linux.iso
+旧版本的VMware虚拟机无法适配新版的linux镜像，建议更新VMware虚拟机。
+如果是最小化安装Linux镜像，再安装VMTools可能会遇到以下几个问题。
+
+(1) 遇到第一个问题：bash:./vmware-install.pl :/usr/bin/perl:bad interpreter:No such file or directory.
+
+           解决方法：yum groupinstall "Perl Support"
+
+             说明：这个安装文件应该是用Perl写的，需要Perl的运行环境，安装好"Perl Support"之后，重新执行 ./vmware-install.pl
+
+(2) 遇到第二个问题：Setup is unable to find the "killall" program on your machine
+
+            解决方法：yum install psmisc
+
+            说明：Psmisc软件包包含三个帮助管理/proc目录的程序。
+
+                             安装下列程序: fuser, killall,pstree和pstree.x11(到pstree的链接)
+
+                            fuser 显示使用指定文件或者文件系统的进程的PID。
+
+                            killall 杀死某个名字的进程，它向运行指定命令的所有进程发出信号。
+
+                            pstree 树型显示当前运行的进程。
+
+                            pstree.x11 与pstree功能相同，只是在退出前需要确认。 
+
+(3) 第三个问题：找不到GCC的安装目录，因为没装。。。
+
+            解决方法：yum install gcc，安装完之后重新执行./vmware-install.pl
+
+(4) 第四个问题：无法找到kernel headers path
+
+            解决方法：yum install kernel-headers-$(uname -r) kernel-devel-$( uname -r) -y
+
+            说明：安装kernel-headers，安装完成后再重新安装vmware tools就可以顺利完成了。
+
+启动脚本位置：
+/etc/init.d/vmware-tools restart
+
+或者安装开源版本的VMTools：
+yum install open-vm-tools
+
+参考资料：
+https://kb.vmware.com/s/article/2073803
+https://blog.csdn.net/dianerbing/article/details/80845395

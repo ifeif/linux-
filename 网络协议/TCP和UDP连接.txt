@@ -1,0 +1,86 @@
+TCP数据报头中的标志位：
+syn同步标志，用来建立连接
+ack确认标志
+	syn=1,ack=0请求连接
+	syn=1,ack=1接收连接
+urg紧急
+psh推送，对缓存区刷新
+rst复位
+fin结束，释放连接
+
+三次握手：
+(客户端主动连接)	        syn
+client(SYNC_SENT)   ---------->    server(LISTEN)
+		    syn+ack
+client(ESTABLISHED) <----------    server(SYNC_REVD)
+		        ack
+client(ESTABLISHED) ---------->    server(ESTABLISHED)
+
+四次挥手：
+(客户端主动关闭)               fin                                               
+client(FIN_WAIT_1)    ---------->    server(ESTABLISHED)     
+		        ack                     
+client(FIN_WAIT_2)    <----------    server(CLOSE_WAIT)
+                                     fin+ack      (轮到服务端发送关闭请求)                                              
+client(TIME_WAIT)     <----------    server(LAST_ACK)
+		        ack
+client(TIME_WAIT)     ---------->    server(CLOSED)                                                         
+(等待2MSL超时后客户端变为CLOSED)
+为什么TIME_WAIT等待的时间是2MSL？
+MSL(Maximum Segment LifeTime)是报文最大生成时间，它是任何报文在网络上存在的最长时间，超过这个时间的报文将被丢弃。TIME_WAIT状态最多保持4分钟。
+为什么断开连接后需要保持一段时间的TIME_WAIT状态？
+1.防止最后一个ack丢失，如果服务端发送完fin后，一直没收到ack，那服务端会重发，这时候如果客户端socket已经释放了，那就会导致消息无人处理，报错。
+2.防止之前的tcp连接，网络链路上还有数据残留的时候就创建新的tcp连接，并等待处理仍在网络上残留的数据包。
+
+为什么握手需要三次？
+主要原因：确认双方的接收能力和发送能力是否正常，防止已经失效的连接请求报文送达服务器后产生错误(失效的请求指客户端只发送不接收的请求)
+第一次握手： 客户端向服务器端发送报文
+证明客户端的发送能力正常
+第二次握手：服务器端接收到报文并向客户端发送报文
+证明服务器端的接收能力、发送能力正常
+第三次握手：客户端向服务器发送报文
+证明客户端的接收能力正常
+
+为什么挥手需要四次？
+这是由于TCP的半关闭(half-close)造成的。半关闭(半打开)是指：TCP提供了连接的一方在结束它的发送后还能接受来自另一端数据的能力。通俗来说，就是不能发送数据，但是还可以接受数据。
+TCP不允许连接处于半关闭状态时(指三次握手期间)，是不能单向传输数据的，因此完成三次握手后才可以传输数据(第三次握手可以携带数据)。
+当连接处于半关闭状态时，TCP是允许单向传输数据的，也就是说服务器此时仍然可以向客户端发送数据，等服务器不再发送数据时，才会发送FIN报文段，同意现在关闭连接。
+这一特性是由于TCP双向通道互相独立所导致的，也使得关闭连接必须经过四次握手。
+
+TCP状态：
+握手：
+LISTEN：监听端口
+ESTABLISHED：已建立连接
+SYN_SENT(SYN_SEND)：发送同步请求(请求建立连接)，在TCP三次握手期间，主动连接端发送了SYN包后，进入SYN_SENT状态，等待对方的ACK包
+SYN_REVD(SYN_RECV)：正在确认同步请求，在TCP三次握手期间，被动连接端收到SYN包后，进入SYN_REVD状态，并向对方发送SYN+ACK包
+挥手：
+CLOSED：已关闭连接
+FIN_WAIT_1 	本端主动发送关闭请求，在TCP四次挥手时，主动关闭端发送FIN包后，进入FIN_WAIT_1状态。
+FIN_WAIT_2	本端等待接收远端的关闭请求，在TCP四次挥手时，主动关闭端收到ACK包后，进入FIN_WAIT_2状态。
+TIME_WAIT	本端已主动关闭连接，等待一段时间(最多为4分钟)该端口才能重新分配，确保服务器正常关闭该连接，在TCP四次挥手时，主动关闭端发送了ACK包之后，进入TIME_WAIT状态，等待最多MSL时间，让被动关闭端收到ACK包。
+CLOSING		连接关闭中(连接非正常关闭，等待一段时间后重试)，在TCP四次挥手期间，主动关闭端发送了FIN包后，没有收到对应的ACK包，却收到对方的FIN包，此时，进入CLOSING状态。
+CLOSE_WAIT	远端等待发送关闭请求或等待超时关闭，在TCP四次挥手期间，被动关闭端收到FIN包后，进入CLOSE_WAIT状态。
+LAST_ACK	远端等待接收最后确认关闭请求，在TCP四次挥手时，被动关闭端发送FIN包后，进入LAST_ACK状态，等待对方的ACK包。
+
+主动连接端可能的状态有： CLOSED、SYN_SEND、ESTABLISHED
+主动关闭端可能的状态有： FIN_WAIT_1、FIN_WAIT_2、TIME_WAIT
+被动连接端可能的状态有： LISTEN、SYN_RECV、ESTABLISHED
+被动关闭端可能的状态有： CLOSE_WAIT、LAST_ACK、CLOSED
+
+套接字(socket)：
+套接字是网络编程中的一个类，存储了四元组(源ip、源端口、目标ip、目标端口)和封装了网络连接的底层操作。
+这样，每次建立tcp连接就只需要创建一个socket类，建立tcp连接也可以说成是建立一个socket会话，
+发送消息只需要发送到对方的socket，读取对方的消息也只需要读取本地的监听socket。
+
+linux与服务器建立TCP连接的命令：
+nc 主机名或IP地址 端口号
+
+参考资料：
+https://blog.mimvp.com/article/44678.html
+https://blog.csdn.net/jiajiren11/article/details/80887528
+https://baijiahao.baidu.com/s?id=1685497690614598021&wfr=spider&for=pc
+https://www.pythonheidong.com/blog/article/1230197/d7bdee7dcff396c10fb8/
+https://blog.csdn.net/zgy666/article/details/106149576
+https://blog.csdn.net/zgy666/article/details/108682078
+https://blog.csdn.net/LOOKTOMMER/article/details/121307137
+https://blog.csdn.net/LOOKTOMMER/article/details/121243476

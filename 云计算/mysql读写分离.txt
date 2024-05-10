@@ -1,0 +1,66 @@
+yum install -y java-1.8.0-openjdk java-1.8.0-openjdk-devel	#安装java环境
+下载mycat-server-1.6程序包
+tar -zxvf Mycat-server-1.6-RELEASE-20161028204710-linux.tar.gz -C /usr/local/	#解压到/usr/local目录
+cd /usr/local/
+chmod -R 777 /usr/local/mycat/
+echo export MYCAT_HOME=/usr/local/mycat/ >> /etc/profile		#添加MYCAT_HOME环境变量
+source /etc/profile		#执行环境变量配置脚本
+echo $MYCAT_HOME	#查看环境变量
+
+rm -rf /usr/local/mycat/conf/schema.xml
+vim /usr/local/mycat/conf/schema.xml
+<?xml version="1.0"?>
+<!DOCTYPE mycat:schema SYSTEM "schema.dtd">
+<mycat:schema xmlns:mycat="http://io.mycat/">
+	<schema name="USERDB" checkSQLschema="true" sqlMaxLimit="100" dataNode="dn1"></schema> 
+	<dataNode name="dn1" dataHost="localhost1" database="test" />  
+	<dataHost name="localhost1" maxCon="1000" minCon="10" balance="3" dbType="mysql" dbDriver="native" writeType="0" switchType="1"  slaveThreshold="100">  
+		<heartbeat>select user()</heartbeat>
+		<writeHost host="hostM1" url="192.168.229.18:3306" user="root" password="123456">	<!-- 设置写服务器 -->
+			<readHost host="hostS1" url="192.168.229.30:3306" user="root" password="123456" />	<!-- 设置读服务器 -->
+		</writeHost>
+	</dataHost>
+</mycat:schema>
+
+chown root:root /usr/local/mycat/conf/schema.xml
+vim /usr/local/mycat/conf/server.xml
+在末尾修改以下内容
+<user name="root">
+	<property name="password">123456</property>
+                <property name="schemas">USERDB</property>
+
+                <!-- 表级 DML 权限设置 -->
+                <!--
+                <privileges check="false">
+                        <schema name="TESTDB" dml="0110" >
+                                <table name="tb01" dml="0000"></table>
+                                <table name="tb02" dml="1111"></table>
+                        </schema>
+                </privileges>
+                 -->
+</user>
+
+
+/bin/bash /usr/local/mycat/bin/mycat start	#启动mycat
+yum install -y net-tools	#安装网络配置工具
+netstat -ntpl		#查看服务器监听端口是否开启9066和8066
+将gpmall-repo文件夹拷贝到/opt目录下
+vim /etc/yum.repos.d/local.repo
+[mariadb]
+name=mariadb
+baseurl=file:///opt/gpmall-repo
+gpgcheck=0
+enabled=1
+
+yum repolist	#列出已配置的yum源
+
+mysql -uroot -p123456 -h127.0.0.1 -P8066
+show databases;
+use USERDB
+show tables;
+select * from company;
+exit
+
+mysql -h127.0.0.1 -P9066 -uroot -p123456 -e 'show @@datasource;'
+
+

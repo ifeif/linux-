@@ -1,0 +1,10 @@
+判断题:
+1.错 2.对 3.对 4.对 5.对 6.对 7.对 8.对 9.对 10.对
+单选题:
+1.D 2.A 3.A 4.D 5.D 6.B 7.C 8.A 9.A 10.B
+多选题:
+1.CD 2.BD 3.ABC 4.AB 5.AB 6.AB 7.ABC 8.AB 9.ABD 10.AB
+简答题:
+1. mv /home/test /home/test2
+2. chmod 754 test
+3. root的UID和GID是0.编辑/etc/passwd,将test用户的UID改为0就可以了.

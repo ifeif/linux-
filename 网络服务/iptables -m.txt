@@ -1,0 +1,28 @@
+-m state 
+      --state {NEW,ESTATBLISHED,INVALID,RELATED}  指定匹配状态
+iptables -A INPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+iptables -A OUTPUT -p tcp -m state --state NEW,ESTABLISHED -j ACCEPT
+
+-m multiport 指定多端口
+      --sport
+      --dport
+      --ports
+iptables -A INPUT -p tcp -m multiport --dport 22,80,8080 -j ACCEPT
+iptables -A OUTPUT -p tcp -m multiport --sport 22,80,8080 -j ACCEPT
+
+-m iprange 指定IP段
+      --src-range ip-ip
+      --dst-range ip-ip
+iptables -A INPUT -p tcp -m iprange --src-range 100.0.0.0/24 --dport 80 -j ACCEPT
+
+-m connlimit 连接限定
+      --comlimit-above # 限定大连接个数
+-m limit 现在连接速率，也就是限定匹配数据包的个数
+      --limit  指定速率
+      --limit-burst # 峰值速率，最大限定
+-m string 按字符串限定
+      --algo bm|kmp  指定算法bm或kmp
+      --string "STRING" 指定字符串本身
+
+https://www.cnblogs.com/elijah-li/p/15737640.html
+https://www.jianshu.com/p/8a25b78c8dfa?open_source=weibo_search

@@ -1,0 +1,43 @@
+安装防火墙：
+yum install -y firewalld
+开启防火墙：
+systemctl start firewalld
+一旦开启防火墙,默认阻止所有未知的连接，需要使用管理工具添加允许通过的规则
+新安装的服务在防火墙没有配置规则，所以也需要添加相应的规则。
+
+firewall-cmd		#基于命令行的firewall服务管理工具
+--get-services		#获取可用的服务
+--list-services		#列出允许通过的服务
+--list-port			#列出允许通过的端口
+--list-all			#列出当前区域防火墙的配置信息
+--list-all-zones		#列出所有区域防火墙的配置信息
+--add-service=服务		#添加允许通过的服务
+--query-service=服务	#查询服务是否允许通过
+--remove-service=服务	#移除允许通过的服务
+--add-port=端口号/tcp或udp	#允许通过的端口号
+--permanent		#永久生效，添加到配置文件里，不影响当前运行的规则
+--zone=区域名		#在哪个区域添加规则
+--reload			#重新加载配置文件，让永久生效的规则立即生效
+
+什么区域(zone)：
+一个区域相当于一个命名空间，独立存在，互不影响。
+查看当前工作区域(初始默认区域为public):
+--get-default-zone
+显示可用的区域：
+--get-zones
+切换工作区域(永久生效)：
+--set-default-zone=区域名
+应急状况模式(阻断一切网络连接):
+--panic-on	#开启
+--panic-off	#关闭
+
+firewall-config		#基于图形化的firewall服务管理工具
+linux必须安装图形界面，在终端输入firewall-config打开
+
+备注：
+防火墙不会阻止当前已建立通道的连接
+问题：
+为什么关闭防火墙用win10的资源管理器连接linux的ftp服务之后再打开防火墙之后还能连接。
+因为win10第一次和linux连接之后建立了一条ftp通道，之后再打开防火墙并不会阻止这条通道的传输。
+必须关闭这条通道之后，防火墙才能对下次发起的ftp请求生效。
+关闭win10的资源管理器并没有断开ftp连接，默认情况下，win10会在一段时间没有ftp传输之后断开。

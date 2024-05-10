@@ -1,0 +1,186 @@
+域名：
+当前域的名字就是当前DNS主服务器的主机名字。
+每个域由一台主服务器管理直属的子域
+在开机时，系统会先向DNS服务器发起请求，检查自己所属的域，并把自己的主机名改为域的名字。
+
+请求者：
+发送DNS查询请求的客户端。
+递归查询：
+当DNS服务器没有查询到记录时，DNS服务器向其他的DNS服务器查询，并递归(逐条)返回最终结果给请求者。
+一般客户端与DNS服务器之间采用递归查询。
+迭代查询：
+当DNS服务器没有查询到记录时，DNS服务器告诉客户端另一台DNS服务器的地址，由客户端(请求者)向另一台DNS服务器查询，如此反复，直至查询到。
+一般DNS服务器与DNS服务器之间采用迭代查询。
+递归和迭代查询的区别：
+递归查询服务器必须返回结果。迭代查询服务器不必须返回结果，请求者会查询另一台服务器。
+
+查询DNS服务相关安装包：
+yum list bind*
+
+yum install -y bind-chroot	#将当前域设为根域，chroot：改变根目录
+
+部分配置文件：
+/var/named/named.ca	#13个根节点的IP地址
+/var/named/named.localhost	#本地主机名的正向解析文件
+/var/named/named.loopback	#本地主机名的反向解析文件
+DNS主配置文件：
+vim /etc/named.conf
+options {
+	listen-on port 53 { any; };	#监听网卡53号端口
+	allow-query { any; };		#允许任何主机查询
+}
+include "/etc/named.rfc1912.zones";	#区域配置文件目录
+
+DNS区域配置文件：
+添加该DNS服务器直属的区域
+一个区域对应一个DNS数据库文件
+注：可以将区域配置写进主配置文件，因为主配置include区域配置文件，按照规范，区域配置应该写进区域配置文件
+vim /etc/named.rfc1912.zones
+zone "abc.com" IN {		#区域的域名
+	type master;		#DNS服务器类型，master:主服务器，slave:辅助服务器
+	file "abc.com.zone";		#对应的正向解析数据文件
+	allow-update { none; };	#允许哪些主机动态更新DNS缓存
+};	#正向解析区域
+zone "200.168.192.in-addr.arpa" IN {	#反写IP网段
+	type master;		#DNS服务器类型，master:主服务器，slave:辅助服务器
+	file "abc.com.ptr";		#对应的反向解析数据文件
+	allow-update { none; };	#允许哪些主机动态更新DNS缓存
+};	#反向解析区域，需要有正向解析区域
+
+正向解析数据文件：
+cp -p /var/named/named.localhost /var/named/abc.com.zone	#复制模板文件，p：同时复制文件权限属性
+vim /var/named/abc.com.zone
+$TTL 1D
+@	IN SOA www.abc.com. root.abc.com.  (	#SOA记录	 主DNS服务器的FQDN 管理员邮箱
+                                        0	; serial		#更新序列号
+                                        1D	; refresh		#更新时间
+                                        1H	; retry		#重试延时
+                                        1W	; expire		#失效时间
+                                        3H )	; minimum	#无效的解析记录的缓存时间
+	NS	www.abc.com.		#NS记录 DNS服务器的FQDN
+主机名	解析类型	对应IP地址
+www	A	192.168.200.200
+web	A	192.168.200.201
+
+反向解析数据文件：
+cp -p /var/named/named.loopback /var/named/abc.com.zone	#复制模板文件，p：同时复制文件权限属性
+vim /var/named/abc.com.zone
+$TTL 1D	#生存时间为1天
+@	IN SOA www.abc.com. root.abc.com.  (	#SOA记录	 主DNS服务器的FQDN 管理员邮箱
+                                        1	; serial		#更新序列号
+                                        1D	; refresh		#更新时间
+                                        1H	; retry		#重试延时
+                                        1W	; expire		#失效时间
+                                        3H )	; minimum	#无效的解析记录的缓存时间
+	NS	www.abc.com.		#NS记录 DNS服务器的FQDN
+主机号	解析类型	对应完整域名
+200	PTR	www.abc.com.
+201	PTR	web.abc.com.
+
+firewall-cmd --add-service=dns --permanent
+firewall-cmd --reload	#配置防火墙
+systemctl start named	#最后启动
+
+参考资料：
+https://blog.csdn.net/weixin_36217005/article/details/88614725
+https://blog.csdn.net/weixin_39467231/article/details/85337010
+https://blog.csdn.net/fangyihang1262/article/details/64918241
+解析类型：
+SOA记录：起始授权记录，一个区域文件只能有一个
+A记录：用来指定主机名(或域名)对应的IP地址记录。(AAAA ipv6)
+CNAME记录：别名解析(域名)
+NS记录：域名服务器记录，用来指定该域名由哪个DNS服务器来进行解析。一个区域解析库可以有多个NS记录，其中一个为主的，在SOA记录指定。
+MX记录：邮件交换记录，指向邮件服务器。
+PTR记录：反向DNS记录，A记录的反向。
+TTL值：生存时间(Time To Live)，DNS记录在DNS服务器上的缓存时间。
+FQDN：完全限定域名，指某台主机，而不是某个域。
+ORIGIN值：@的值赋值给ORIGIN变量，@表示当前区域名字。这意味着@是给$ORIGIN变量赋予默认值。
+第一个@符号：特殊代码，表示引用当前区域的名字，不包含主机名。
+后面两个@符号：表示无效值，语法高亮提示无效。
+
+多台从DNS服务协同工作：
+DNS服务器默认允许区域传输，可忽略以下步骤(可选)：
+从DNS服务器配置：
+首先在主DNS修改配置文件/etc/named.conf，在options(选项)中添加：
+	allow-transfer { 192.168.200.201; };	#允许哪些从DNS从主DNS传输区域文件
+systemctl restart named	#重启，更新主DNS服务配置
+
+可以不添加NS记录，可忽略以下步骤(可选)：
+修改区域数据文件，添加NS记录，添加的DNS服务器将作为权威应答：
+	NS	www.abc.com.	#NS记录 主DNS服务器的FQDN
+	NS	web.abc.com.	#NS记录 从DNS服务器的FQDN
+www	A	192.168.200.200
+web	A	192.168.200.201
+反向区域数据文件也要做同样的修改，另外更新序列号改为1。
+
+然后在从DNS服务器修改区域文件/etc/named.rfc1912.zones：
+zone "abc.com" IN {
+	type slave;
+	file "slaves/abc.com.zone";
+	masters	{ 192.168.200.200; }	#主DNS服务器地址
+};
+zone "200.168.192.in-addr.arpa" IN {
+	type slave;
+	file "slaves/abc.com.ptr";
+	masters	{ 192.168.200.200; }	#主DNS服务器地址
+};
+systemctl restart named	#重启，更新从DNS服务配置
+记得配置防火墙，DNS主从服务配置完毕！
+
+DNS缓存服务器配置：
+DNS缓存服务器只缓存之前查询过的记录，下次查询时将使用缓存的DNS记录
+当主DNS服务器不工作时，已缓存的记录仍然可以查询
+在缓存DNS修改配置文件/etc/named.conf
+	forward	only;				#只跟随
+	forwarders { 192.168.200.200; };		#跟随哪一台DNS服务器
+	dnssec-validation no;			#是否加密区域文件
+systemctl restart named	#重启，更新DNS服务配置
+记得配置防火墙，DNS缓存服务配置完毕！
+
+客户端配置DNS服务器：
+vim /etc/resolv.conf		#该配置文件临时生效
+search abc.com		#当用nslookup工具查询主机名时的默认补充域名后缀
+nameserver 192.168.200.200	#首选DNS服务器
+nameserver 114.114.114.114	#备用DNS服务器，在首先DNS请求不到记录时则向备用DNS请求
+配置网卡的DNS1和DNS2可以永久生效
+DNS解析优先级：
+vim /etc/nsswitch.conf
+hosts:	files dns	#优先用本地的host文件解析，否则再请求DNS服务器解析
+
+安装nslookup工具包：
+ yum install -y bind-utils
+nslookup www.abc.com	#查找域名为www.abc.com的主机IP
+#哪台DNS服务器回复请求
+Server:	192.168.200.201	
+Address:	192.168.200.201#53
+#请求返回结果
+Non-authoritative answer:	#非主DNS服务器的回复
+Name:	www.abc.com
+Address: 192.168.200.200
+
+DNS小技巧：
+1.DNS实现负载均衡：
+原理：每次域名解析请求都会根据DNS配置文件中的主机记录从上到下的排列顺序返回不同的解析结果，
+这将客户端的访问引导到不同的机器上去，使得客户端访问到不同的服务器，从而达到负载均衡的目的。
+DNS负载均衡采用的是简单的轮询算法，不能区分不同客户端或服务器之间的差异(例如win10有本地dns缓存)，也不能检查服务器的运行状态。
+同一个主机名配置多个IP地址：
+www	A	192.168.200.200
+www	A	192.168.200.201
+www	A	192.168.200.202
+
+2.多个主机名配置同一个IP地址：
+www	A	192.168.200.200
+web	A	192.168.200.200
+
+3.找不到(匹配到)对应的主机名时，使用"*"进行匹配：
+*	A	192.168.200.200
+
+注：
+NetworkManager服务会自动同步网卡dns到resolv.conf文件，可以永久禁用systemctl disable NetworkManager
+VMware虚拟机的nat模式中，物理机上的虚拟网卡用来自动检测可用的DNS服务器
+
+更多资料：
+https://blog.csdn.net/weixin_44800915/article/details/94287726
+https://www.cnblogs.com/yxd1308243944/p/14024503.html
+https://www.cnblogs.com/kevingrace/p/9359989.html
+https://www.likecs.com/show-203977430.html

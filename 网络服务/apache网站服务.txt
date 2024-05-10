@@ -1,0 +1,142 @@
+apachectl -v	#查看已安装的apache版本
+apachectl start	#启动服务
+apachectl restart	#重启服务
+apachectl stop	#停止服务
+apachectl status	#查看状态
+和systemctl命令效果相同，apache就是httpd服务
+
+apache是一款免费的web网站服务器软件。
+yum install -y httpd			#安装apache服务软件包
+vim /etc/httpd/conf/httpd.conf	#修改主配置文件
+
+网站全局配置：
+DocumentRoot "/var/www/html"	#网站根目录(物理路径)
+
+Listen 80	#监听本机的端口
+
+ServerName www.szpt.com:80	#网站域名
+
+DirectoryIndex index.html		#默认文档
+
+自定义网站根目录(http自带的访问控制)：
+DocumentRoot "/web"	#将web目录作为网站根目录
+http服务默认拒绝访问任何目录,需要额外添加允许的条目
+<Directory "/">
+	#不允许覆盖网站.htaccess文件
+	AllowOverride None
+	#Allow open access:
+	Require all denied
+</Directory>	#无条件拒绝访问任何目录，默认已添加在全局配置中
+现在将/web作为网站根目录，需要添加以下内容：
+<Directory "/web">
+	Require all granted
+</Directory>	#无条件允许访问/web目录
+
+允许通过防火墙:
+firewall-cmd --add-service=http --permanent
+firewall-cmd --reload	#使修改立即生效
+配置selinux(允许进程访问文件)：
+selinux工作原理：进程的安全上下文和文件的安全上下文进行比较，相同则通过。
+ls -ldZ /var/www/html	#查看文件安全上下文
+chcon -R -t httpd_sys_content_t /web	#递归修改安全上下文
+或者
+semanage fcontext -a -t httpd_sys_content_t "/web(/.*)?"	#效果同上
+restorecon -Rv /web	#使semanage命令修改立即生效
+
+允许8888端口作为http服务端口：
+semanage port -a -t http_port_t -p tcp 8888
+允许8888端口通过防火墙：
+firewall-cmd --add-port=8888/tcp --permanent
+firewall-cmd --reload
+
+虚拟主机技术：
+在一台物理主机上可以添加多个网站，通过三种不同的方式访问一台物理机上对应的网站。
+如果虚拟主机配置和全局配置有冲突，则全局配置会被替换，以虚拟主机的配置为准。
+
+默认情况：
+<VirtualHost 192.168.200.200>	#注：IP地址不能写错，否则不起作用
+	DocumentRoot /var/www/web1
+	ServerName web1.abc.com
+	<Directory "/var/www/web2">
+		Require all granted
+	</Directory>
+</VirtualHost>
+1.不同域名：
+vim /etc/hosts	#修改hosts本地域名文件
+192.168.200.200 web1.abc.com
+192.168.200.201 web2.abc.com
+
+<VirtualHost 192.168.200.200>
+	DocumentRoot /var/www/web2
+	ServerName web2.abc.com
+	<Directory "/var/www/web2">
+		Require all granted
+	</Directory>
+</VirtualHost>
+
+2.不同IP：
+vim /etc/sysconfig/network-scripts/ifcfg-eno16777736	#给网卡添加多个IP
+IPADDR=192.168.200.200
+PREFIX=24
+IPADDR1=192.168.200.201
+PREFIX1=24
+
+<VirtualHost 192.168.200.201>
+	DocumentRoot /var/www/web3
+	<Directory "/var/www/web3">
+		Require all granted
+	</Directory>
+</VirtualHost>
+
+3.不同端口：
+Listen 80
+Listen 81	#添加监听端口
+
+<VirtualHost 192.168.200.200:81>
+	DocumentRoot /var/www/web4
+	<Directory "/var/www/web4">
+		Require all granted
+	</Directory>
+</VirtualHost>
+
+以上的访问控制(Directory标签)可以不在每个虚拟主机中添加，统一添加在全局配置中：
+<Directory /var/www>
+	Require all granted
+</Directory>
+访问控制：
+<Directory "/var/www/web1">
+	Order allow,deny				#匹配顺序，优先允许
+	Allow from 192.168.200.150			#某个地址
+	Allow from 192.168.200.0/24			#某个网段
+	Allow from 192.168.200.100 - 192.168.200.200	#某个地址范围
+</Directory>
+
+<Directory "/var/www/web2">
+	Order deny,allow
+	Deny from 192.168.200.150
+</Directory>
+
+用户认证：
+htpasswd -c /etc/httpd/webuser webuser01	#创建web用户目录
+htpasswd /etc/httpd/webuser webuesr02	#添加用户
+htpasswd /etc/httpd/webuser webuser03
+
+<Directory "/var/www/web1">
+	AuthUserFile "/etc/httpd/webuser"
+	AuthName "please input account and password:"
+	AuthType Basic
+	#允许特定用户
+	Require user webuser01 webuser02
+	#valid-user表示账号文件内的所有用户
+	Require valid-user
+</Directory>
+
+AllowOverride：
+AllowOverride参数就是指明Apache服务器是否去找.htacess文件作为配置文件，
+如果设置为none,那么服务器将忽略.htacess文件，
+如果设置为All,那么所有在.htaccess文件里有的指令都将被重写。
+
+参考资料：
+https://www.jianshu.com/p/3cde8150d5da
+https://www.cnblogs.com/liluxiang/p/9450826.html
+http://www.80note.com/2019/01/451.html

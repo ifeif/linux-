@@ -1,0 +1,49 @@
+#!/bin/bash
+systemctl stop firewalld
+setenforce 0	#前期准备
+yum install -y python3	#安装py3环境
+[ -d ~/.pip ] || mkdir ~/.pip	#如果存在则不创建，不存在则新建
+cat >~/.pip.conf<<EOF	#将以下内容输入到pip.conf
+[global]
+index-url=https://mirrors.aliyun.com/pypi/simple	#更改pip源
+EOF
+#pip3 install -U pip	#更新pip，这条命令有时不管用
+python3 -m pip install --upgrade pip	#更新pip
+
+pip3 install tensorflow==1.5 #安装tf1.5
+pip3 install matplotlib
+pip3 install jupyter notebook
+jupyter notebook --generate-config	#生成jupyter配置文件
+echo -e "\033[36m===请设置jupyter登陆密码===\033[0m"
+jupyter notebook password	#设置登陆密码
+cat > ~/.jupyter/jupyter_notebook_config.py <<EOF #编辑jupyter配置文件
+c.NotebookApp.ip = '*'
+c.NotebookApp.port = 8888 
+c.NotebookApp.allow_root = True #是否允许root权限
+c.NotebookApp.notebook_dir = '/root'	#工作目录
+c.NotebookApp.open_browser = False	#不自动打开浏览器
+EOF
+nohup jupyter notebook &
+sleep 2
+echo -e "\033[36m===在浏览器输入本机ip:8888打开jupyter===\033[0m"
+
+jupyter notebook命令参数：
+--no-browser	#不自动打开浏览器
+--port=8888	#指定端口
+--ip=127.0.0.1	#指定IP
+
+安装插件包Jupyter NbExtensions Configurator：
+Jupyter NbExtensions Configurator是Jupyter Notebook的一个插件库，包含许多实用工具，
+只需在jupyter网页中勾选相应插件就能自动载入。可以让你在Jupyter Notebook上的工作效率进一步的提高。
+pip3 install jupyter_nbextensions_configurator jupyter_contrib_nbextensions
+jupyter contrib nbextension install --user
+jupyter nbextensions_configurator enable --user
+安装jupyter美化主题：
+pip3 install jupyterthemes
+jt -l		#列出所有主题
+jt -t 主题名	#选择主题
+jt -r 		#恢复默认主题
+
+参考资料：
+https://segmentfault.com/a/1190000017985395
+https://zhuanlan.zhihu.com/p/161221247

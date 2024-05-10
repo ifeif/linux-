@@ -1,0 +1,50 @@
+计划任务又称定时任务，在指定的时间段自动执行命令。
+
+date	#显示当前时间
+date -s "2021-12-22 22:22:22"	#设置当前时间
+
+一次性执行：
+at 23:30	#指定执行命令的时间并编辑计划任务
+>init 6	#要自动执行的命令
+>......	#省略
+>按下ctrl+d键结束编写计划任务
+
+通过管道符添加任务计划
+echo "systemctl restart network" | at 23:30
+
+at -l	#列出已设置的计划任务
+atrm 序号	#删除指定序号的计划任务
+
+循环执行：
+crond服务是centos7自带的，并且默认开启。提供周期性(有规律)地执行命令。
+编写的任务表保存在/var/spool/cron/目录下
+crontab -{e|l|r} [-u 用户名]
+–e	#使用vim编辑任务表
+-l	#列出任务表
+-r	#删除任务表
+-u chen	#编辑chen用户的任务表，注：只有root可以编辑其他用户的任务表
+
+分	时	日	月	星期	执行的命令或脚本(外部命令必须写绝对路径)
+30	23 	*	*	1-5	/usr/sbin/init 0
+*/2	*	*	*	1,3,5	echo helloworld
+*号：表示所有时间段
+,号：表示分开的时间段
+-号：表示连续的时间段
+/号：表示执行任务的间隔时间，例如*/2表示每隔2分钟执行一次任务
+注：计划任务执行的结果不会显示在终端中。crond服务中执行的外部命令必须加上绝对路径
+
+问题：设置系统在每天2：40压缩备份系统/boot目录.压缩后的文件名为/boot.tar.gz
+crontab
+40	2	*	*	*	tar –czf /boot.tar.gz  /boot
+按下ctrl+d键结束编写
+
+特殊时间表达：
+@reboot:	Run once after reboot.      重启之后执行一次，包括开机
+@yearly:	Run once a year, ie.  "0 0 1 1 *".  一年执行一次，1月1号0点0分执行
+@annually:	Run once a year, ie.  "0 0 1 1 *". 一年执行一次，1月1号0点0分执行
+@monthly:	Run once a month, ie. "0 0 1 * *". 一月执行一次，每月1号0点0分执行
+@weekly:	Run once a week, ie.  "0 0 * * 0". 一周执行一次
+@daily:	Run once a day, ie.   "0 0 * * *".  一天执行一次
+@hourly:	Run once an hour, ie. "0 * * * *".  一小时执行一次
+格式：
+@reboot	command

@@ -1,0 +1,10 @@
+scp是（secure copy）的简写，用于在Linux下进行远程拷贝文件的命令，和它类似的命令有cp，
+不过cp只是在本机进行拷贝不能跨服务器，而且scp传输是加密的。可能会稍微影响一下速度。
+
+格式：scp [参数] <源地址 (用户名@IP地址或主机名)>:<文件路径> <目的地址 (用户名@IP地址或主机名)>:<文件路径>
+scp 传输的文件名 用户名@目标地址:文件保存的目录
+
+参考资料：
+https://blog.csdn.net/w8827130/article/details/90574699
+https://www.cnblogs.com/liuyakai/p/14267734.html
+https://www.cnblogs.com/pengdonglin137/p/14052132.html

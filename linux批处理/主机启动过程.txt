@@ -1,0 +1,26 @@
+主机启动过程：
+计算机从主板BIOS芯片(固件)中加载BIOS程序，完成硬件自检。
+BIOS读取硬盘起始的512个字节的主引导记录(MBR)到内存。
+主引导记录包含分区表和引导加载程序(boot loader)，例如grub。
+最后把控制权交给引导加载器完成操作系统内核的加载。
+总结：BIOS -> 读取MBR ->引导加载程序 -> 操作系统内核
+
+由于某些限制，操作系统内核不能直接保存在LVM或RAID分区上，因为LVM服务需要内核启动才能读取到LVM分区。
+必须要创建一个原始的xfs分区来容纳这些文件。linux默认会将该分区挂载到/boot目录，一般大小为200~500MB。
+
+centos6系统启动过程：
+1.linux内核被加载后，第一个执行的程序便是/sbin/init，并依据/etc/inittab文件进行初始化工作。
+/etc/inittab文件用于设定linux默认运行等级，也可以通过init程序手动更改运行等级
+
+2.init进程执行rc.sysinit脚本，该脚本包含设定PATH、设定网络配置、启动swap分区、设定/proc等等。
+
+3.启动内核模块，依据/etc/modules.conf文件或/etc/modules.d目录下的文件来装载内核模块。
+
+4.根据运行级别(RunLevel)，执行rc0.d~rc6.d中的启动脚本，来完成相应的初始化工作和启动相应的服务。
+
+5.执行/etc/rc.d/rc.local脚本，最后再执行/bin/login程序，进入用户登陆界面
+
+UEFI是新版的BIOS，用于取代老旧的传统BIOS，而GPT分区表则取代老旧的MBR分区表。
+传统BIOS启动只能启动MBR分区的磁盘，不能启动GPT分区的磁盘。
+在装双系统的时候，先装windows，后装linux，因为windows的引导加载器无法启动linux，
+而linux的引导加载器grub可以识别windows，并在安装linux时覆盖windows的引导加载器。

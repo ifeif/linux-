@@ -1,0 +1,26 @@
+在企业中，我们希望通过内网和外网访问同一个域名的时候得到不同的ip地址来区分内外网
+DNS的双向解析是实现内网主机和外网主机访问同一网站域名，定义到不同服务器
+cp -p  abc.com.zone   abc.com.inter
+
+vim /etc/named.rfc1912.zones	#编辑区域文件
+
+view indns {
+	match-cilents { 192.168.200.200; };	#内网IP
+	zone "." IN {
+		type hint;
+		file "named.ca";
+	};
+};
+view outdns {
+	match-cilents { any; };		#外网IP
+	zone "." IN {
+		type hint;
+		file "named.ca";
+	};
+};
+systemctl restart named
+
+两台客户主机询问同一个dns服务器，得到不同的结果
+这是因为将两台主机分别定义为内网和外网，解析得到的ip不同
+
+未完待续。。。

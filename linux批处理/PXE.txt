@@ -1,0 +1,722 @@
+#!/bin/bash
+#pxe system auto install scripts
+#by xiandian
+#----------------   env  config   ------------
+
+
+
+
+HOSTNAME=pxe
+Interface_Name=eth0
+
+PXENET=10.1.0.0
+PXENET_START=10.1.0.100
+PXENET_END=10.1.0.250
+
+CENTOS6_Root_Part=200000
+CENTOS6_Custom_part1=10000
+CENTOS6_Link_NAME=eth0
+
+# Int_1_Name=enp8s0
+# Int_2_Name=enp9s0
+CENTOS7_Root_Part=15360
+CENTOS7_Root_Part_Compute=1000000
+CENTOS7_Custom_part1=100000
+CENTOS7_Custom_part2=100000
+# CENTOS7_Link_NAME=enp8s0
+
+
+
+
+################################################################################
+################################################################################
+#---------------------------------------------------------------------------------------------------
+#-----------------------------------------------------------------------------
+IP=`ifconfig $Interface_Name |grep Bcast | sed 's/:/ /g'`
+MY_IP=`echo $IP |awk -F\  '{print $3}'`
+NETMASK=`echo $IP |awk -F\  '{print $7}'`
+hostname $HOSTNAME
+sed -i "s/HOSTNAME=.*/HOSTNAME=$HOSTNAME/g" /etc/sysconfig/network
+#------------------------------------------------------------------------------
+system_version=`cat /proc/version  |awk '{print $3}' |awk -F. '{print $4$5}'`
+if [ $system_version != 'el6x86_64' ];then
+    echo -e "\033[31m ERROR\nPlease ensure that the operating system for Centos6.5!\033[0m"
+    exit 1
+fi
+
+install_pxe()
+{
+rpm -qa |grep system-config-kickstart
+if [ 0  -eq  $? ]; then
+    echo -e "\033[31mPxe is already installed\033[0m"
+    exit 1
+fi
+Find_CENTOS7_ISO=$(find / -name CentOS-7-x86_64-DVD-1511.iso)
+if [  ! -f $Find_CENTOS7_ISO ] ; then
+      echo -e "\033[31mPlease confirm centos7 iso is READY!\033[0m"
+      exit 1
+    else
+    mkdir -p  /var/www/html/centos7
+    mount -o loop $Find_CENTOS7_ISO /var/www/html/centos7
+    sed -i '/centos7/d' /etc/fstab
+    echo "$Find_CENTOS7_ISO  /var/www/html/centos7   iso9660 defaults,ro,loop 0 0" >> /etc/fstab
+fi
+Find_CENTOS6_ISO=$(find / -name CentOS-6.5-x86_64-bin.iso)
+if [  ! -f $Find_CENTOS6_ISO ] ; then
+      echo -e "\033[31mPlease confirm iso is READY  \033[0m"
+      exit 1
+    else
+    mkdir -p  /var/www/html/centos6
+    mount -o loop $Find_CENTOS6_ISO /var/www/html/centos6
+    sed -i '/centos6/d' /etc/fstab
+    echo "$Find_CENTOS6_ISO  /var/www/html/centos6   iso9660 defaults,ro,loop 0 0" >> /etc/fstab
+    mv /etc/yum.repos.d /etc/yum.repos.d.`date +%m%d%H%M`
+    mkdir -p /etc/yum.repos.d
+cat >/etc/yum.repos.d/local.repo <<- EOF
+[centos]
+baseurl=file:///var/www/html/centos6
+gpgcheck=0
+enabled=1
+name=centos
+EOF
+    yum clean all
+fi
+service iptables stop
+chkconfig iptables off
+echo  "$MY_IP  $HOSTNAME " >>   /etc/hosts
+
+
+yum install -y httpd tftp-server wget syslinux dhcp 
+if [ 0  -ne  $? ]; then
+    echo -e "\033[31m  Please confirm yum    \033[0m"
+    exit 0
+else
+    echo -e "\033[31m  YUM  IS  READY   \033[0m"
+fi
+sed -i 's/Listen 80/Listen 8888/g' /etc/httpd/conf/httpd.conf
+
+cat > /etc/dhcp/dhcpd.conf  <<- EOF
+default-lease-time 600;
+max-lease-time 7200;
+log-facility local7;
+subnet $PXENET netmask $NETMASK {
+        range $PXENET_START $PXENET_END;
+        option routers $MY_IP;
+        next-server $MY_IP;
+        filename "pxelinux.0";
+}
+EOF
+service dhcpd restart
+chkconfig dhcpd on
+service iptables stop
+chkconfig iptables off
+sed -i 's/SELINUX=.*/SELINUX=disabled/g'  /etc/selinux/config
+sed -i 's/disable.*/disable                 = no/g' /etc/xinetd.d/tftp
+
+mkdir -p /var/lib/tftpboot/{centos6,centos7}
+cp /usr/share/syslinux/pxelinux.0 /var/lib/tftpboot/
+mkdir /var/lib/tftpboot/pxelinux.cfg
+cp /var/www/html/centos6/isolinux/isolinux.cfg  /var/lib/tftpboot/pxelinux.cfg/default
+
+#------------------------centos6------------------------------------------------------
+\cp -p  /var/www/html/centos6/isolinux/*  /var/lib/tftpboot/centos6/
+\cp -p  /var/www/html/centos6/images/pxeboot/*  /var/lib/tftpboot/centos6/
+
+
+#-------------------------centos7-----------------------------------------
+\cp -p  /var/www/html/centos7/images/pxeboot/*  /var/lib/tftpboot/centos7/ 
+\cp -p  /var/www/html/centos7/isolinux/*  /var/lib/tftpboot/centos7/ 
+rm -rf /etc/httpd/conf.d/welcome.conf 
+
+cat > /var/lib/tftpboot/pxelinux.cfg/default <<- EOF
+default centos6/vesamenu.c32
+timeout 50
+display centos6/boot.msg
+menu background centos6/splash.jpg
+menu title http://www.1daoyun.com!
+menu color border 0 #ffffffff #00000000
+menu color sel 7 #ffffffff #ff000000
+menu color title 0 #ffffffff #00000000
+menu color tabmsg 0 #ffffffff #00000000
+menu color unsel 0 #ffffffff #00000000
+menu color hotsel 0 #ff000000 #ffffffff
+menu color hotkey 7 #ffffffff #ff000000
+menu color scrollbar 0 #ffffffff #00000000
+label centos7
+  menu label ^Install CentOS 7 CONTROLLER
+  menu default
+  kernel centos7/vmlinuz
+  append initrd=centos7/initrd.img ks=http://$MY_IP:8888/centos7_ks_controller.cfg 
+label centos7
+  menu label ^Install CentOS 7 COMPUTE
+  kernel centos7/vmlinuz
+  append initrd=centos7/initrd.img ks=http://$MY_IP:8888/centos7_ks_compute.cfg 
+label centos6
+  menu label ^Install CentOS 6
+  kernel centos6/vmlinuz
+  append initrd=centos6/initrd.img ks=http://$MY_IP:8888/centos6_ks.cfg 
+EOF
+cat > /var/www/html/centos6_ks.cfg <<- EOF
+#platform=x86, AMD64, or Intel EM64T 
+#version=DEVEL 
+# Firewall configuration 
+firewall --disabled 
+# Install OS instead of upgrade 
+install 
+# Use network installation 
+url --url=http://$MY_IP:8888/centos6
+# Root password 
+rootpw  000000
+#rootpw --iscrypted $1$chengran$TeFFyqRQPsPrXHmzhQxPm/
+# System authorization information 
+auth  --useshadow  --enablemd5 
+# Use graphical install 
+graphical 
+firstboot --disable 
+# System keyboard 
+keyboard us 
+# System language 
+lang en_US 
+# SELinux configuration 
+selinux --disabled
+# Installation logging level 
+logging --level=info 
+# Reboot after installation 
+#reboot 
+# System timezone 
+timezone Asia/Shanghai 
+# Network information 
+network  --bootproto=dhcp --device=eth0 --onboot=on 
+# System bootloader configuration 
+key --skip 
+bootloader --append="rhgb quiet" --location=mbr 
+# Clear the Master Boot Record 
+zerombr 
+# Partition clearing information 
+clearpart --all --initlabel 
+# Disk partitioning information 
+part /boot --fstype="ext4" --size=200
+part swap --fstype="swap" --size=16000
+part / --fstype="ext4" --size=$CENTOS6_Root_Part
+%pre
+# set welcom info
+echo "Welcome "
+%end
+%post
+echo "Welcome to Xiandian" >> /etc/motd
+%end
+
+%packages --nobase
+openssh-server
+openssh-clients
+wget
+vim
+%end
+EOF
+
+service httpd restart
+service dhcpd restart
+service xinetd restart
+
+chkconfig httpd on
+chkconfig xinetd on
+chkconfig dhcpd on
+
+setup
+
+}
+
+
+
+config_controller()
+{
+cat > /var/www/html/centos7_ks_controller.cfg  <<- EOF
+#platform=x86, AMD64, or Intel EM64T 
+#version=DEVEL 
+# Firewall configuration 
+firewall --enabled
+# Install OS instead of upgrade 
+install 
+# Use network installation 
+url --url=http://$MY_IP:8888/centos7/
+# Root password 
+rootpw  000000
+#rootpw --iscrypted $1$chengran$TeFFyqRQPsPrXHmzhQxPm/
+# System authorization information 
+auth  --useshadow  --enablemd5 
+# Use graphical install 
+graphical 
+firstboot --enabled
+# System keyboard 
+keyboard us 
+# System language 
+lang en_US 
+# SELinux configuration 
+selinux --enforcing
+# Installation logging level 
+logging --level=info 
+# Reboot after installation 
+#reboot 
+# System timezone 
+timezone Asia/Shanghai 
+# Network information 
+network  --bootproto=dhcp --device=$Interface_Name --onboot=yes --noipv6 
+# System bootloader configuration 
+bootloader --append="rhgb quiet" --location=mbr 
+
+# Partition clearing information 
+clearpart --all --initlabel 
+# Disk partitioning information 
+part /boot --fstype="ext4" --size=200
+part swap --fstype="swap" --size=1000
+part / --fstype="ext4" --size=$CENTOS7_Root_Part
+%pre
+# set welcom info
+echo "Welcome "
+%end
+%post
+echo "" >> /etc/motd
+echo "Welcome to Xiandian" >> /etc/motd
+echo "This is controller node" >> /etc/motd
+echo "" >> /etc/motd
+
+Int_1_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '1p'\`
+Int_2_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '2p'\`
+
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+echo "DEVICE=\$Int_1_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "IPADDR=192.168.100.10" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "GATEWAY=192.168.100.1" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+
+
+echo "DEVICE=\$Int_2_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "IPADDR=192.168.200.10" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+sed -i -e '/testdisk1/d' -e '/testdisk2/d' /etc/fstab
+rm -rf /root/*.ks
+
+%end
+
+%packages --nobase
+openssh-server
+openssh-clients
+wget
+%end
+EOF
+#启动服务器
+iptables -F
+
+
+
+
+service httpd restart
+service dhcpd restart
+service xinetd restart
+
+chkconfig httpd on
+chkconfig xinetd on
+chkconfig dhcpd on
+
+}
+
+config_compute()
+{
+cat > /var/www/html/centos7_ks_compute.cfg  <<- EOF
+#platform=x86, AMD64, or Intel EM64T 
+#version=DEVEL 
+# Firewall configuration 
+firewall --enabled
+# Install OS instead of upgrade 
+install 
+# Use network installation 
+url --url=http://$MY_IP:8888/centos7
+# Root password 
+rootpw  000000
+#rootpw --iscrypted $1$chengran$TeFFyqRQPsPrXHmzhQxPm/
+# System authorization information 
+auth  --useshadow  --enablemd5 
+# Use graphical install 
+graphical 
+firstboot --enabled
+# System keyboard 
+keyboard us 
+# System language 
+lang en_US 
+# SELinux configuration 
+selinux --enforcing
+# Installation logging level 
+logging --level=info 
+# Reboot after installation 
+#reboot 
+# System timezone 
+timezone Asia/Shanghai 
+# Network information 
+network  --bootproto=dhcp --device=$Interface_Name --onboot=yes --noipv6 
+# System bootloader configuration 
+bootloader --append="rhgb quiet" --location=mbr 
+
+# Partition clearing information 
+clearpart --all --initlabel 
+# Disk partitioning information 
+part /boot --fstype="ext4" --size=200
+part "BIOS Boot" --fstype="BIOS Boot" --size=1
+part swap --fstype="swap" --size=16000
+part / --fstype="ext4" --size=$CENTOS7_Root_Part_Compute
+part /testdisk1 --fstype="ext4" --size=$CENTOS7_Custom_part1
+part /testdisk2 --fstype="ext4" --size=$CENTOS7_Custom_part2
+%pre
+# set welcom info
+echo "Welcome "
+%end
+%post
+echo "" >> /etc/motd
+echo "Welcome to Xiandian" >> /etc/motd
+echo "This is compute node" >> /etc/motd
+echo "" >> /etc/motd
+
+Int_1_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print $1}' |sed -n '1p'\`
+Int_2_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print $1}' |sed -n '2p'\`
+
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+echo "DEVICE=\$Int_1_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "IPADDR=192.168.100.20" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "GATEWAY=192.168.100.1" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+
+
+echo "DEVICE=\$Int_2_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "IPADDR=192.168.200.20" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+sed -i -e '/testdisk1/d' -e '/testdisk2/d' /etc/fstab
+rm -rf /root/*.ks
+
+%end
+
+%packages --nobase
+openssh-server
+openssh-clients
+wget
+%end
+EOF
+#启动服务器
+iptables -F
+
+
+service httpd restart
+service dhcpd restart
+service xinetd restart
+
+chkconfig httpd on
+chkconfig xinetd on
+chkconfig dhcpd on
+
+}
+
+
+config_all_node()
+{
+##config_controller
+cat > /var/www/html/centos7_ks_controller.cfg  <<- EOF
+#platform=x86, AMD64, or Intel EM64T 
+#version=DEVEL 
+# Firewall configuration 
+firewall --enabled
+# Install OS instead of upgrade 
+install 
+# Use network installation 
+url --url=http://$MY_IP:8888/centos7/
+# Root password 
+rootpw  000000
+#rootpw --iscrypted $1$chengran$TeFFyqRQPsPrXHmzhQxPm/
+# System authorization information 
+auth  --useshadow  --enablemd5 
+# Use graphical install 
+graphical 
+firstboot --enabled
+# System keyboard 
+keyboard us 
+# System language 
+lang en_US 
+# SELinux configuration 
+selinux --enforcing
+# Installation logging level 
+logging --level=info 
+# Reboot after installation 
+#reboot 
+# System timezone 
+timezone Asia/Shanghai 
+# Network information 
+network  --bootproto=dhcp --device=$Interface_Name --onboot=yes --noipv6 
+# System bootloader configuration 
+bootloader --append="rhgb quiet" --location=mbr 
+
+# Partition clearing information 
+clearpart --all --initlabel 
+# Disk partitioning information 
+part /boot --fstype="ext4" --size=200
+part swap --fstype="swap" --size=1600
+part / --fstype="ext4" --size=$CENTOS7_Root_Part
+%pre
+# set welcom info
+echo "Welcome "
+%end
+%post
+echo "" >> /etc/motd
+echo "Welcome to Xiandian" >> /etc/motd
+echo "This is controller node" >> /etc/motd
+echo "" >> /etc/motd
+
+Int_1_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '1p'\`
+Int_2_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '2p'\`
+
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+echo "DEVICE=\$Int_1_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "IPADDR=192.168.100.10" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "GATEWAY=192.168.100.1" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+
+
+echo "DEVICE=\$Int_2_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "IPADDR=192.168.200.10" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+
+#Net_1_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '1p'\`
+
+if [[ ! "\$Int_1_Name" == "enp7s0" ]]; then
+        #statements
+NetworkName1=enp7s0
+NetworkName2=enp8s0
+
+# Net_1_Name=enp8s0
+# Net_2_Name=enp9s0
+
+sed -i 's/rhgb quiet/net.ifnames=0 biosdevname=0 &/' /etc/default/grub
+grub2-mkconfig -o /boot/grub2/grub.cfg
+
+MacAddress1=\`ip a |grep link/ether|awk '{print \$2}'|sed -n '1p'\`
+MacAddress2=\`ip a |grep link/ether|awk '{print \$2}'|sed -n '2p'\`
+
+cat > /etc/udev/rules.d/70-persistent-net.rules <<- EEF
+
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="\$MacAddress1", ATTR{type}=="1", KERNEL=="eth*", NAME="\$NetworkName1"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="\$MacAddress2", ATTR{type}=="1", KERNEL=="eth*", NAME="\$NetworkName2"
+
+EEF
+
+sed -i "s/\$Int_1_Name/\$NetworkName1/g" /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+sed -i "s/\$Int_2_Name/\$NetworkName2/g" /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+mv /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name /etc/sysconfig/network-scripts/ifcfg-\$NetworkName1
+mv /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name /etc/sysconfig/network-scripts/ifcfg-\$NetworkName2
+fi
+
+sed -i -e '/testdisk1/d' -e '/testdisk2/d' /etc/fstab
+rm -rf /root/*.ks
+
+%end
+
+%packages --nobase
+openssh-server
+openssh-clients
+wget
+%end
+EOF
+
+##---------------------------------------------------------
+##config_compute
+cat > /var/www/html/centos7_ks_compute.cfg  <<- EOF
+#platform=x86, AMD64, or Intel EM64T 
+#version=DEVEL 
+# Firewall configuration 
+firewall --enabled
+# Install OS instead of upgrade 
+install 
+# Use network installation 
+url --url=http://$MY_IP:8888/centos7
+# Root password 
+rootpw  000000
+#rootpw --iscrypted $1$chengran$TeFFyqRQPsPrXHmzhQxPm/
+# System authorization information 
+auth  --useshadow  --enablemd5 
+# Use graphical install 
+graphical 
+firstboot --enabled
+# System keyboard 
+keyboard us 
+# System language 
+lang en_US 
+# SELinux configuration 
+selinux --enforcing
+# Installation logging level 
+logging --level=info 
+# Reboot after installation 
+#reboot 
+# System timezone 
+timezone Asia/Shanghai 
+# Network information 
+network  --bootproto=dhcp --device=$Interface_Name --onboot=yes --noipv6 
+# System bootloader configuration 
+bootloader --append="rhgb quiet" --location=mbr 
+
+# Partition clearing information 
+clearpart --all --initlabel 
+# Disk partitioning information 
+part /boot --fstype="ext4" --size=200
+part "BIOS Boot" --fstype="BIOS Boot" --size=1
+part swap --fstype="swap" --size=16000
+part / --fstype="ext4" --size=$CENTOS7_Root_Part_Compute
+part /testdisk1 --fstype="ext4" --size=$CENTOS7_Custom_part1
+part /testdisk2 --fstype="ext4" --size=$CENTOS7_Custom_part2
+%pre
+# set welcom info
+echo "Welcome "
+%end
+%post
+echo "" >> /etc/motd
+echo "Welcome to Xiandian" >> /etc/motd
+echo "This is compute node" >> /etc/motd
+echo "" >> /etc/motd
+
+Int_1_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '1p'\`
+Int_2_Name=\`ip a|grep BROADCAST|awk '{print \$2}'|awk -F ':' '{print \$1}' |sed -n '2p'\`
+
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+rm -rf  /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+echo "DEVICE=\$Int_1_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "IPADDR=192.168.100.20" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+echo "GATEWAY=192.168.100.1" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+
+
+echo "DEVICE=\$Int_2_Name" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "TYPE=Ethernet" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "ONBOOT=yes" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "NM_CONTROLLED=no" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "BOOTPROTO=static" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "IPADDR=192.168.200.20" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+echo "PREFIX=24" >>/etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+
+#Net_1_Name=\`ip a|grep BROADCAST|awk '{print $2}'|awk -F ':' '{print $1}' |sed -n '1p'\`
+
+if [[ ! "\$Int_1_Name" == "enp7s0" ]]; then
+        #statements
+NetworkName1=enp7s0
+NetworkName2=enp8s0
+
+# Net_1_Name=enp8s0
+# Net_2_Name=enp9s0
+
+sed -i 's/rhgb quiet/net.ifnames=0 biosdevname=0 &/' /etc/default/grub
+grub2-mkconfig -o /boot/grub2/grub.cfg
+
+MacAddress1=\`ip a |grep link/ether|awk '{print $2}'|sed -n '1p'\`
+MacAddress2=\`ip a |grep link/ether|awk '{print $2}'|sed -n '2p'\`
+
+cat > /etc/udev/rules.d/70-persistent-net.rules <<- EEF
+
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="\$MacAddress1", ATTR{type}=="1", KERNEL=="eth*", NAME="\$NetworkName1"
+SUBSYSTEM=="net", ACTION=="add", DRIVERS=="?*", ATTR{address}=="\$MacAddress2", ATTR{type}=="1", KERNEL=="eth*", NAME="\$NetworkName2"
+
+EEF
+
+sed -i "s/\$Int_1_Name/\$NetworkName1/g" /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name
+sed -i "s/\$Int_2_Name/\$NetworkName2/g" /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name
+
+mv /etc/sysconfig/network-scripts/ifcfg-\$Int_1_Name /etc/sysconfig/network-scripts/ifcfg-\$NetworkName1
+mv /etc/sysconfig/network-scripts/ifcfg-\$Int_2_Name /etc/sysconfig/network-scripts/ifcfg-\$NetworkName2
+fi
+
+sed -i -e '/testdisk1/d' -e '/testdisk2/d' /etc/fstab
+rm -rf /root/*.ks
+
+%end
+
+%packages --nobase
+openssh-server
+openssh-clients
+wget
+%end
+EOF
+#启动服务器
+iptables -F
+
+
+service httpd restart
+service dhcpd restart
+service xinetd restart
+
+chkconfig httpd on
+chkconfig xinetd on
+chkconfig dhcpd on
+
+}
+
+
+
+setup()
+{
+echo -e "\033[34m-------Install   Info------------\033[0m"
+echo -e "\033[35m      1:  install  pxe           \033[0m"
+echo -e "\033[35m      2:  switch controller mode \033[0m"
+echo -e "\033[35m      3:  switch compute mode    \033[0m"
+echo -e "\033[35m      4:  switch all mode        \033[0m"
+echo -e "\033[37m Please select installation services: (eg  :1 / 2 / 3 )\033[0m" 
+read KEY
+case $KEY in
+1)
+install_pxe;
+;;
+2)
+config_controller;
+;;
+3) 
+config_compute;
+;;
+4)
+config_all_node;
+;;
+*)
+echo -e "\033[31m Choose wrong, please try again \033[0m "
+esac
+}
+setup

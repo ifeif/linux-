@@ -1,0 +1,104 @@
+iSCSI(Internet Small Computer System Interface)：
+iSCSI是基于SCSI存储技术及TCP/IP网络传输块设备的协议。中文名为网络小型计算机系统接口，又称为 IP-SAN。
+NFS和samba都是基于文件系统的共享服务，属于NAS(network attached storage，网络附加存储)，
+而iSCSI是基于块设备(磁盘)的共享服务(iSCSI可以直接共享未格式化的磁盘)，属于SAN(storage area networks，存储局域网络)。
+
+配置iSCSI服务端：
+iSCSI协议的服务端软件有两种：
+方法一：
+yum install -y epel-release		#安装第三方扩充源
+yum install -y scsi-target-utils		#安装tgtd服务程序
+vim /etc/tgt/targets.conf				#编辑iSCSI服务主配置文件
+<target iqn.yyyy-mm.reversed.domain.name:identifier>	#创建共享磁盘连接器，iqn.年-月.域名反写:标识符
+	backing-store 本地块设备路径			#共享的块设备路径
+	initiator-address IP地址或网段			#限制连接iSCSI服务的客户端IP
+	incominguser 用户名 密码			#设置认证用户和密码(启用CHAP)
+	write-cache off | on				#关闭或开启缓存
+</target>
+开启tatd服务程序：
+systemctl start tgtd;systemctl enable tgtd		
+tat-admin -s或--show				#显示共享磁盘信息
+
+方法二：
+yum install targetd targetcli -y		#安装iSCSI服务端程序和管理iSCSi服务的交互式配置工具
+targetcli				#使用iSCSI管理工具，进入targetcli操作
+targetcli操作常用命令:
+ls	#列出当前的操作目录
+pwd	#查看当前的路径
+cd	#切换操作目录，在不同的目录下可以执行该目录的专有操作
+exit	#保存并退出targetcli操作
+1.创建共享磁盘：
+/backstores/block create  idisk1 /dev/sdb	#在/backstores/block操作目录下执行create 名称 本地块设备路径
+2.创建共享磁盘连接器：
+/iscsi create iqn.2022-05.com.chen:server	#iqn.年-月.域名反写:标识符
+3.将共享磁盘映射到连接器：
+cd /iscsi/iqn.2022-05.com.chen:server/tpg1	#切换操作目录
+luns create /backstores/block/idisk1		#将共享磁盘映射到当前连接器
+4.创建全局连接器：
+acls create iqn.2022-05.com.chen:client
+5.启用chap认证(可以不启用)：
+cd acls/iqn.2022-05.com.chen:client
+set auth userid userid=chen		#设置用户名
+set auth password=112233445566	#设置密码，由于是chap认证，密码要介于12位到16位之间
+exit	#保存并退出targetcli操作
+
+vim /etc/target/targetd.yaml		#编辑targetd服务配置文件
+password: 123456			#设置密码，这里设为123456(注意冒号后面不要少空格)
+block_pools: []			#设置用于分配卷的LVM卷组，这里设为空
+target_name:iqn.2022-05.com.chen:server	#设置targetd将使用的iSCSI连接器名称  
+开启targetd服务程序：
+systemctl start targetd;systemctl enable targetd
+启动iSCSI服务程序以后，服务器将监听3260端口来获取客户端的连接：
+ss -napt | grep 3260		#查询3260端口状态
+
+配置iSCSI客户端：
+yum install -y iscsi-initiator-utils(ubuntu/debian系统：sudo apt install open-iscsi)
+配置客户端的发起程序(如果使用方法二搭建iSCSI服务需要这一步)：
+vim /etc/iscsi/initiatorname.iscsi
+InitiatorName=iqn.2022-05.com.chen:client  	#修改为在之前服务端配置的全局连接器
+客户端在连接iSCSI服务端时不需要输入密码，只要全局连接器的名称与服务端的全局连接器名称一致即可
+编辑iSCSI客户端的配置文件，启用客户端的chap认证(如果iSCSI服务端设置了认证)：
+vim /etc/iscsi/iscsid.conf
+#连接(login)时启用CHAP认证 
+node.session.auth.authmethod = CHAP
+node.session.auth.username = 用户名
+node.session.auth.password = 密码
+#侦测(discovery)时启用CHAP认证
+discovery.sendtargets.auth.authmethod = CHAP
+discovery.sendtargets.auth.username = 用户名
+discovery.sendtargets.auth.password = 密码
+开启iscsid服务程序：
+systemctl restart iscsid;systemctl enable iscsid
+
+探测iSCSI服务器：
+iscsiadm --mode discovery --type sendtargets --portal iSCSI服务器IP:3260	#端口号可省略，默认为3260
+iscsiadm -m discovery -t st -p iSCSI服务器IP					#简写
+探测到的共享磁盘记录保存在/var/lib/iscsi/nodes/目录下
+列出探测到的共享磁盘：
+iscsiadm -m node
+删除所有探测到的记录(断开连接才能删除)：
+iscsiadm -m node -o delete
+连接到指定iSCSI服务器(探测到才能连接)：
+iscsiadm -m node -T 共享磁盘名 -p iSCSI服务器IP:3260 --login或 -l
+连接到所有探测到的iSCSI服务器：
+iscsiadm -m node -L all
+列出当前已连接的iSCSI服务器：
+iscsiadm -m session
+断开指定iSCSI服务器：
+iscsiadm -m node -T 共享磁盘名 -p iSCSI服务器IP:3260 --logout或-u
+断开所有已连接的iSCSI服务器：
+iscsiadm -m node -U all
+永久挂载共享磁盘：
+vim /etc/fstab
+共享设备路径  挂载目录  文件系统格式  defaults,_netdev  0  0
+#_netdev参数表示当系统联网后再进行挂载操作，以免系统开机时间过长(如果共享磁盘连不上也会导致开机很慢)。
+列出所有块设备：
+lsblk
+
+如果客户端开机和关机很慢，可以禁用iscsi服务：
+systemctl stop iscsi;systemctl disable iscsi
+
+参考资料：
+https://www.cnblogs.com/lb477/p/15342319.html
+https://www.bilibili.com/video/BV1wk4y127xT/
+https://github.com/open-iscsi/targetd

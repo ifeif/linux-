@@ -1,0 +1,88 @@
+NFS服务：
+yum install nfs-utils		#安装nfs
+systemctl start nfs		#启动nfs
+mkdir /share		#创建共享文件夹
+chmod -Rf 777 /share	#修改权限 R:递归更改子目录 f:强制
+vim /etc/exports		#nfs配置文件
+共享目录		访问规则
+/share		192.168.200.0/24(rw)	#允许192.168.200.0网段的主机进行读写操作
+/tmp		*(ro)			#允许任何主机读取，不可写
+showmount -e 192.168.200.200		#查看服务器共享的目录
+mount -t nfs 192.168.200.200:/share /mnt	#挂载网络分区
+exportfs -rv				#重新加载nfs服务配置
+
+允许NFS服务通过防火墙
+firewall-cmd --add-service=nfs --permanent
+firewall-cmd --add-service=rpc-bind --permanent
+firewall-cmd --add-service=mountd --permanent
+firewall-cmd --reload
+NFS不受selinux的影响，跟其他文件共享服务对比，不需要配置selinux，也算是NFS的优点。
+
+samba服务：
+yum install -y samba
+vim /etc/samba/smb.conf		#编辑smb服务配置文件
+
+[global] 服务器通用或全局设置的部分
+security = user		#常用的只有user一种模式
+注：centos7已禁用security = share，匿名登录在[global]下加入map to guest = Bad User即可
+
+[homes] 用户的家目录共享
+
+[printers] 定义打印机资源和服务
+
+[sharename] 自定义的共享目录名字
+comment = "共享文件夹"		#共享的描述信息
+path = /share			#共享目录路径
+browseable = yes|no		#是否在目录列表中显示
+writable = yes|no  			#是否可写
+guest ok  = yes|no			#是否允许匿名访问
+
+valid users = user01 user02		#允许哪些用户访问
+write list = user02			#允许哪些用户写入
+
+chown nobody:nobody /share	#修改拥有者为匿名用户
+systemctl start smb			#启动SMB服务
+
+允许SMB服务通过防火墙:
+firewall-cmd --add-service=samba --permanent	#--permanent永久生效
+firewall-cmd –reload
+配置selinux：
+selinux是linux下的强制性的文件访问权限控制服务
+ll -dZ /share			#查看目录的selinux安全上下文
+chcon -R -t samba_share /share	#修改安全上下文参数
+getsebool -a			#显示selinux的全局配置
+setsebool -P samba_enable_home_dirs on	#允许访问共享家目录，-P永久生效
+
+问题：
+win10在资源管理器输入//192.168.200.200访问文件共享服务很慢
+解决方法：
+NetworkManager服务会在启动时自动同步网卡配置的DNS信息到主机DNS配置文件/etc/resolv.conf
+不希望同步DNS信息那么就关闭NetworkManager服务
+systemctl stop NetworkManager	#临时关闭
+systemctl disable NetworkManager	#永久关闭
+服务器配置了DNS地址会影响smb共享文件夹的访问速度(访问会非常慢)
+把/etc/resolv.conf文件中的DNS地址删掉就可以解决
+
+samba可以针对用户进行访问控制
+samba帐号必须要存在于Linux系统中(/etc/passwd)，但其密码的却是单独维护的。
+useradd -s /sbin/nologin user01		#创建linux用户并且不可登录
+smbpasswd -a user01或pdbedit -a user01	#创建samba用户数据库并设置密码
+pdbedit -L				#列出samba用户
+
+linux访问smb文件夹：
+yum install -y samba-client	#安装smb客户端
+方式一：
+smbclient -L 192.168.200.200 -U user01
+方式二：	
+smbclient //192.168.200.200/share -U user01
+
+挂载到本地目录：
+mount -t cifs //目标地址/共享目录名 /本地挂载目录 -o username=用户名%密码
+或
+mount -t cifs //目标地址/共享目录名 /本地挂载目录 -o username=用户名,password=密码
+
+VMware自带的文件共享：
+首先开启VMware的文件共享功能
+再把文件挂载到虚拟机里
+vmware-hgfsclient		#列出共享文件夹
+mount -t fuse.vmhgfs-fuse .host:/共享文件夹 本地挂载目录

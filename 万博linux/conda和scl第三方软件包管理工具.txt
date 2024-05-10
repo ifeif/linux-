@@ -1,0 +1,77 @@
+scl简介：
+全称为Software Collections，它给RHEL/CentOS用户提供一种以更方便的方式来安装和运行多个版本的软件包，同时避免把当前系统环境搞混。类似python的venv(virtualenv)。
+scl支持linux系统同时安装多个版本的软件包，然后通过scl enable命令来激活相应的虚拟环境，而不影响当前的系统环境。实际上是scl帮你管理环境变量。scl一般用于安装gcc等开发工具。
+安装scl软件源：
+yum install -y centos-release-scl
+列出scl源的所有软件包：
+yum --disablerepo="*" --enablerepo="centos-sclo-rh" list all	#临时禁用所有源，激活scl源，再进行列出
+安装scl的虚拟环境软件包：
+yum install <scl-package-name>
+scl enable <scl-package-name> bash	#激活相应软件包的虚拟环境
+exit				#退出scl虚拟环境
+开机自动启动相应scl软件包的虚拟环境：
+vim ~/.bashrc
+source scl_source enable <scl-package-name>
+从上面的命令不难发现，虚拟环境实际上是更改当前用户的环境变量，
+只是在当前用户的环境变量的基础上添加相应软件包的环境变量。
+所以正常的软连接也可以添加相应软件包的环境。
+
+列出已安装的scl虚拟环境软件包：
+scl -l
+scl的虚拟环境工作目录：
+/opt/rh/scl-package-name
+示例：
+yum install devtoolset-9
+scl enable devtoolset-9 bash
+which gcc		#该命令的结果应该是/opt/rh/devtoolset-9/root/usr/bin/gcc
+
+Conda简介：
+Conda是一个开源的python模块包管理系统和python环境管理系统，用于在一个系统上安装多个版本的python环境及其模块包，并在它们之间轻松切换。
+Conda专门为Python程序创建的。Conda与pip不同的地方在于Conda可以安装多个版本的python环境和python模块包。
+
+conda分为anaconda和miniconda版。anaconda是一个大而全的工具集合， 包含了常用的python模块。
+miniconda是一个单纯的conda工具，仅自带极少的python必要的包，所以推荐使用miniconda。
+
+下载Conda安装脚本：
+wget -c https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh	#-c下载中断时恢复继续下载，而不是重新下载
+运行安装脚本(过程中会提示安装目录，默认在~/miniconda3)：
+bash Miniconda3-latest-Linux-x86_64.sh
+添加国内频道(相当于添加国内conda软件源)：
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/free
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/pkgs/main
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/conda-forge/
+conda config --add channels https://mirrors.tuna.tsinghua.edu.cn/anaconda/cloud/bioconda/
+conda频道的配置文件保存在~/.condarc目录下
+查看已添加的频道：
+conda config --get channels
+设置开机不自动启动base环境：
+conda config --set auto_activate_base false
+重启系统或执行当前用户环境变量脚本：
+init 6或. .bashrc
+conda安装完必须要重启系统或执行.bashrc脚本才会生效，并且默认会有一个叫base的虚拟环境，自带python3.8和必要的模块包
+可以使用which python命令查看当前使用的是系统内建python环境还是conda的python环境
+conda安装的模块必须在conda的虚拟环境中才能生效
+
+conda常用命令：
+conda list	-n 虚拟环境名		#列出已安装的模块和python环境，如果不用-n指定虚拟环境则默认查看base
+conda install -y 模块名		#安装python模块，默认安装在base虚拟环境
+conda install -y python=版本号 -p 目录	#安装特定版本的python环境软件包，-p指定安装目录
+conda install -y 模块名=版本号		#安装特定版本的模块
+conda upgrade 模块名			#更新python模块
+conda remove 模块名		#卸载模块，默认卸载base虚拟环境中的模块
+conda虚拟环境管理：
+conda create  -y 模块名=版本号 -n 虚拟环境名 	#创建该模块的虚拟环境
+#-n指定虚拟环境名字，-y跳过安装的确认提示，若模块在之前未安装则自动安装
+conda env list或conda info -e	#列出已存在的虚拟环境
+conda activate 虚拟环境名	#启动虚拟环境
+conda deactivate		#退出虚拟环境
+conda [env] remove -n 虚拟环境名 --all	#删除虚拟环境
+conda create -n 虚拟环境名 --clone 已存在的虚拟环境名	#在已有的虚拟环境上克隆虚拟环境
+示例：
+conda create -n tf python=3.8 tensorflow=2.2	#创建python3.8的tensorflow虚拟环境
+
+参考资料：
+https://www.jianshu.com/p/0fd9624114af
+https://www.bilibili.com/read/cv8956636
+https://www.jianshu.com/p/edaa744ea47d
+https://www.cnblogs.com/peanutly/articles/15496454.html

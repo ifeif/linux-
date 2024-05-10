@@ -1,0 +1,14 @@
+NetworkManager服务提供自动管理网络，简称NM服务。
+其中一个最典型的用途就是根据网卡的dns生成resolv.conf文件。
+
+当你手动管理网络时，可能会跟NM服务发生冲突，导致网卡无法启动。
+解决方案1
+	关闭NM服务：
+	systemctl stop NetworkManager
+	systemctl disable NetworkManager
+解决方案2
+	在网卡配置文件添加以下内容：
+	NM_CONTROLLED=no	#使网卡不受NM服务控制
+
+参考资料：
+https://www.cnblogs.com/heardic/p/14011453.html

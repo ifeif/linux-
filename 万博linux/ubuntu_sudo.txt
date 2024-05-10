@@ -1,0 +1,32 @@
+ubuntu系统安装成功后，root用户默认是没有密码的，因此也就无法登录root用户。
+如需修改root密码需要使用以下命令：
+sudo passwd root
+sudo用于普通用户暂时使用root权限。
+使用sudo服务执行命令需要验证当前用户密码，验证密码后的5分钟内无需再次验证密码。
+格式：sudo [参数] 执行的命令
+
+添加新用户:
+useradd -s /bin/bash -m chen	#m:创建用户的家目录，s:指定shell命令解释器,未指定则无法启动终端
+#ubuntu系统推荐使用adduser/deluser命令来管理用户，使用起来更方便，这里不再演示。
+给新用户添加sudo权限(CentOS也可以用)：
+vim etc/sudoers		#修改sudo的主配置文件
+用户	主机=(执行身份)	可执行的命令列表(绝对路径)
+root	ALL=(ALL:ALL)	ALL
+chen	ALL=(ALL:ALL)	ALL	
+#在这里添加，执行sudo需要验证密码
+
+%sudo	ALL=(ALL:ALL)	ALL		#%sudo意思为sudo组下的所有用户都能使用sudo权限
+chen	ALL=(ALL:ALL)	NOPASSWD:ALL	#NOPASSWD意思为执行sudo不需要验证密码
+#在这里添加，执行sudo不需要验证密码
+#执行身份可以是用户或用户组
+最后:wq!强制保存
+
+sudo命令相关参数：
+-h:查看帮助信息
+-i:登陆root用户
+-k:清除密码有效时间
+-l:列出当前用户的sudo权限
+-s 执行的命令:使用在/etc/passwd配置文件里给当前用户所指定的shell执行命令，没有指定则使用环境变量SHELL所指定的shell
+sudo命令相关技巧：
+!!	#重新执行上一次执行过的命令，!!会被替换为上一条执行过的命令
+sudo !!	#以root权限执行上一条命令，因权限不够需要在命令前加sudo时非常有用

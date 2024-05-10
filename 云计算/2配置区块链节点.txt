@@ -1,0 +1,83 @@
+配置ssh服务：
+yum install openssl* -y;yum remove NetworkManager -y
+yum install openssh* -y
+
+vim /etc/ssh/sshd_config
+UseDNS no	#不使用DNS
+systemctl restart sshd
+systemctl enable sshd
+ssh-keygen
+cd ~/.ssh
+第一台机
+ssh-copy-id -i id_rsa.pub 10.10.1.200
+ssh-copy-id -i id_rsa.pub 10.10.1.201
+ssh 10.10.1.201
+第二台机
+ssh-copy-id -i id_rsa.pub 10.10.1.200
+ssh-copy-id -i id_rsa.pub 10.10.1.201
+ssh 10.10.1.200
+
+===========================================================
+配置docker服务：
+systemctl restart docker;systemctl enable docker
+传到ubuntu虚拟机
+scp docker_images.tar.gz chen@192.168.200.200:/home/chen/
+传到centos7虚拟机
+scp docker_images.tar.gz root@10.10.1.200:/root/
+tar -zxvf docker_images.tar.gz
+yum install docker-ce* -y
+docker load < docker_images/docker_registry.tar
+docker tag 1fd8e1b0bb7e registry:latest		#tag的内容为上一条命令输出的镜像sha256值
+docker images	#查看镜像
+启动registry容器
+docker run -d --name registry -p 5000:5000 --restart=always -v /storage/registry:/tmp/registry registry
+编辑json文件
+vi /etc/docker/daemon.json
+{"insecure-registries":["fiscoorg:5000"]}
+systemctl restart docker
+echo 10.10.1.200 fiscoorg >> /etc/hosts
+scp /etc/hosts 10.10.1.201:/etc
+scp /etc/docker/daemon.json 10.10.1.201:/etc/docker
+docker load < fiscoorg.tar
+docker tag c557791bf6fd fiscoorg:5000/fiscobcos:v2.6.0	#贴标签
+docker images	#查看镜像
+docker push fiscoorg:5000/fiscobcos:v2.6.0
+两台主机配置防火墙：
+systemctl restart firewalld;systemctl enable firewalld
+firewall-cmd --add-port=20200/tcp --zone=public --permanent
+firewall-cmd --add-port=20201/tcp --zone=public --permanent
+firewall-cmd --add-port=30300/tcp --zone=public --permanent
+firewall-cmd --add-port=30301/tcp --zone=public --permanent
+firewall-cmd --reload
+第二台机重启docker并拉取镜像：
+systemctl restart docker
+docker pull fiscoorg:5000/fiscobcos:v2.6.0
+
+===========================================================
+配置区块链节点：
+scp build.sh root@10.10.1.200:/root
+vi node_list
+10.10.1.200:2 agency1 1 30300,20200,8545
+10.10.1.201:2 agency1 2 30300,20200,8545
+bash build.sh -f node_list
+scp -r /root/nodes 10.10.1.201:/root
+第一台机			第二台机
+cd /root/nodes/10.10.1.200	cd /root/nodes/10.10.1.201
+bash start_all.sh
+docker ps
+docker logs xxx(CREATED ID)
+
+===========================================================
+配置国密区块链：
+scp tassl.tar.gz root@10.10.1.200:/root
+cd
+mkdir .fisco
+tar -zxvf tassl.tar.gz -C .fisco
+bash build.sh -f node_list -o guomi_nodes -G
+scp -r /root/guomi_nodes 10.10.1.201:/root
+第一台机			第二台机
+cd /root/guomi_nodes/10.10.1.200	cd /root/guomi_nodes/10.10.1.201
+bash start_all.sh
+docker ps
+docker logs xxx(CREATED ID)
+

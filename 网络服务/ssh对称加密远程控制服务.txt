@@ -1,0 +1,103 @@
+﻿非对称加密(钥匙对)：
+对方的公钥：加密数据
+对方的私钥：解密公钥加密的数据
+用私钥加密的数据只有对应的公钥才能解密
+用公钥加密的数据只有对应的私钥才能解密
+
+连接过程：
+c生成钥匙对,发送公钥给s-->s用公钥加密数据,发送数据给c-->c用自己的私钥解密数据
+公钥文件认证过程：
+c发起ssh请求,发送公钥给s-->s拿公钥和自己保存的公钥对比-->对比一致,用公钥加密数据发送给c-->c用自己的私钥解密数据
+c必须有私钥才能得到真正的数据，一般私钥文件会被再次加密。
+用户密码认证过程：
+c发起ssh请求-->s发送主机公钥给c,c收到主机公钥并进行确认-->确认通过,用公钥加密数据发送给s-->s用主机私钥解密数据
+安装ssh服务(几乎所有的linux默认安装了ssh客户端和服务端)：
+yum install -y openssh*
+修改ssh服务端主配置文件：
+vim /etc/ssh/sshd_config
+Port 22			←ssh服务监听端口
+UseDNS no		←不使用DNS解析目标地址，加快连接速度
+GSSAPIAuthentication no	←关闭GSSAPI认证，系统首先会尝试GSSAPI认证，关闭则加快连接速度
+PermitRootLogin yes	←是否允许root登陆
+PermitEmptyPasswords no	←是否允许空密码用户登录；如果要使用空密码，请删除/etc/shadow文件中的用户密码
+PasswordAuthentication yes	←是否启用用户密码认证
+PubkeyAuthentication yes	←是否启用公钥文件认证
+AuthorizedKeysFile      .ssh/authorized_keys	#被授权的公钥存放路径(客户端上传的公钥)
+HostKey /etc/ssh/ssh_host_rsa_key		#主机默认生成好的公钥存放路径
+
+systemctl start sshd		#启动ssh服务
+注：
+/etc/ssh/sshd_config为ssd服务端配置文件
+/etc/ssh/ssh_config为ssd客户端配置文件
+"#"注释后面带空格表示后面的是描述信息
+"#"注释后面不带空格表示后面的是相关参数信息,也是默认参数配置信息
+
+ssh的两种认证方式：
+1.用户密码认证(在配置文件里开启用户密码认证)：
+	ssh 用户名@目标地址	#连接成功后提示输入用户密码
+
+2.公钥文件认证(在配置文件里开启公钥文件认证)：
+手动生成钥匙对：
+	ssh-keygen
+三次回车：
+	1.钥匙对的存放路径(默认存放在~/.ssh文件夹下)，id_rsa为私钥文件，id_rsa.pub为公钥文件
+	2.设置私钥密码(可以为空，不加密私钥文件)
+	3.重新输入私钥密码
+上传公钥到远程主机：
+	ssh-copy-id 目标用户名@目标地址	#-i参数可以指定公钥的路径
+登陆到远程主机：
+	ssh 用户名@目标地址		#-i参数可以指定私钥的路径，-p参数可以指定端口号
+注：
+[用户名@]可以省略，默认使用当前登陆的用户名
+主机默认生成好的公钥存放路径：
+/etc/ssh/ssh_host_rsa_key.pub
+上传的公钥存放路径(被授权的公钥)：
+~/.ssh/authorized_keys
+known_hosts文件说明：
+首次建立ssh连接时，会收到服务端发送过来的主机公钥信息，并存放到~/.ssh/known_hosts文件中。
+ssh会把你每个你访问过计算机的公钥都记录在~/.ssh/known_hosts文件中。
+对于没有被记录过的主机公钥，建立ssh连接时会发出警告。
+要点：
+远程主机用ssh-copy-id命令上传公钥，需要验证用户密码。
+本地主机可以直接给authorized_keys文件追加id_rsa.pub文件的内容。
+
+配置本机无密码登陆到本机：
+ssh-keygen	#生成钥匙对
+cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys	#上传公钥到本机
+ssh 127.0.0.1
+
+解决Agent admitted failure to sign using the key报错，使用下面命令：
+ssh-add	#把私钥添加到ssh-agent的高速缓存中
+参数：
+-D：删除ssh-agent中的所有密钥
+-d：从ssh-agent中的删除指定钥匙，后面跟公钥或私钥路径
+-L：显示ssh-agent中的公钥
+-l：显示ssh-agent中的私钥
+
+
+scp是ssh服务提供的远程文件拷贝命令。
+上传命令格式：scp   [参数]   本地文件   用户名@目标地址:保存路径
+下载命令格式：scp   [参数]   用户名@目标地址:目标文件    保存路径
+参数：
+-v	显示传输进度
+-r	递归，传输目录
+-P	指定远程主机的ssh服务端口号
+
+sftp是基于ssh加密的文件传输服务：
+sftp 用户名@目标地址	#指定端口参数-o Port=22
+sftp>   #进入到操作阶段,可以在这里输入操作指令
+sftp>	help 显示帮助信息
+	cd   切换远程目录路径
+	lcd  切换本地目录路径
+	ls   显示远端主机目录文件列表
+	lls  显示本地
+	pwd  查看远端工作目录信息
+	lpwd 查看本地
+	rm   删除文件
+	put /tmp/ssscp.txt    /tmp/	上传文件到远端服务器
+	get /tmp/ssscp.txt    /opt/	远程文件下载到本地
+	#上传/下载可以不接目录,注意切换目录位置,或者自己接参数说明文件在那个位置
+说明：只要想查看本地的东西在命令前面加一个l即可!
+
+参考资料：
+https://blog.csdn.net/qq_34672033/article/details/89633244

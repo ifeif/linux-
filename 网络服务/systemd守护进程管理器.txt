@@ -1,0 +1,140 @@
+在linux内核启动完以后，会执行/etc/rc.d/rc.local脚本，最后再执行/bin/login程序，进入用户登陆界面
+传统的做法，如果要在linux里添加开机自启的命令，需要在/etc/rc.d/rc.local脚本中添加由于init进程是串行启动的，
+rc.local脚本会在所有其他服务启动完之后执行(centos7及以后已弃用该脚本，如需使用该脚本需要手动赋予可执行权限),
+而systemd是并行执行的。
+
+systemd取代了initd，成为内核加载完以后系统启动的第一个进程(PID为1)，其他进程都是它的子进程。
+target取代了initd的RunLevel(运行等级),target(服务组)就是一组unit(服务)，当启动某个target的时候就会启动里面所有的unit。
+现在所使用的init进程都会自动转为systemd进程来执行，例如命令init 0会有相应的systemctl poweroff。
+在centos6，守护进程的启动脚本保存在/etc/rc.d/init.d/，默认运行等级配置文件为/etc/inittab
+在centos7及以后，守护进程的启动脚本保存在/usr/lib/systemd/system/，默认运行等级配置文件为/etc/systemd/system/default.target
+systemd服务的配置文件为/etc/systemd/system.conf
+运行等级(RunLevel)：
+init 0 --> poweroff.target
+init 1 --> rescue.target
+init 2 --> multi-user.target
+init 3 --> multi-user.target
+init 4 --> multi-user.target
+init 5 --> graphical.target
+init 6 --> reboot.target
+
+如何区分一个进程是不是守护进程(daemon)？
+守护进程由systmd进程启动，如果一个进程的父进程的ID(PPID)为1(父进程为systemd)，表示其为守护进程。
+systemctl命令专门用来管理服务(守护进程)：
+systemctl	[list-units]		#列出所有服务的运行状态
+systemctl list-ounit-files	#列出所有服务的开机自启状态
+systemctl daemon-reload	#重新加载systemd服务
+systemctl list-dependencies	#查看服务的依赖关系
+systemctl --failed		#查看启动失败的服务
+systemctl --type=service	#查看常用服务的运行状态(不包含系统服务)
+systemctl is-enabled 服务名	#查看服务是否开机启动
+systemctl enable 服务名 --now	#开启服务自启并立即启动服务，--now只有在服务禁用时才生效
+systemctl disable 服务名 --now	#关闭服务自启并立即关闭服务，--now只有在服务自启时才生效
+systemctl get-default		#查看默认target
+systemctl isolate graphical.target	#当前立即切换为图形界面
+systemctl isolate multi-user.target	#当前立即切换为多用户文本界面
+systemctl isolate poweroff.target	#立即关机，同init 0
+systemctl set-default graphical.target	#开机默认启动图形界面
+systemctl set-default multi-user.target	#开机默认启动文本界面(控制台)
+systemctl list-dependencies multi-user.target	#查看指定target包含的所有服务(unit)
+服务状态说明：
+loaded		#服务初始化完成，已正常加载配置文件
+not-found	#服务配置文件没有找到
+falied		#服务启动失败，配置文件错误
+actvie(running)	#服务正在运行一个或多个进程
+actvie(exited)	#仅执行一次就正常结束的服务，目前并没有任何进程在系统中执行
+active(waitting)	#正在执行当中，不过还需要等待其他的事件才能继续处理
+inactive		#服务关闭
+enabled		#服务启用自启
+disabled		#服务禁用自启
+static		#服务开机启动项不可被管理
+masked		#服务禁止建立启动链接
+注：static指服务对应的service文件中没有定义[Install]区域，因此无法配置为开机启动服务，只能作为其他配置文件的依赖。
+常用参数(参数后面接上服务名，服务名的.service后缀可省略)：
+restart：重启服务，可启动服务
+reload：服务重新加载配置文件
+status：查看服务状态
+start：启动服务
+stop：停止服务
+enable：开启自启
+disable：关闭自启
+mask：冻结(禁用)服务启动脚本
+unmask：启用服务启动脚本
+show：查看服务的Unit配置
+kill：强制关闭服务，向进程发送sigkill信号
+注：把服务设为开机自启就是在/etc/systemd/system/multi-user.target.wants/目录里建立对应服务的启动脚本的软链接。
+禁用服务开机自启就是删除/etc/systemd/system/multi-user.target.wants/目录中对应服务的软链接。
+
+安装的服务的启动脚本保存在/usr/lib/systemd/system/目录下
+用户自定义的启动脚本保存在/etc/systemd/system/目录下
+/usr/lib/systemd/system存放系统服务，开机不需要登录就能自动启动
+/usr/lib/systemd/user存放用户服务，需要登录后才能启动
+添加自定义service启动脚本(作为服务、守护进程、Unit文件)：
+vim /etc/systemd/system/服务名.service
+[Unit]
+Description=服务描述
+Documentation=文档地址
+After=network.target	#启动顺序，在什么服务或服务组启动完之后启动
+
+[Service]
+Type=simple		#服务类型
+User=用户名		#服务执行的用户，默认为root，其他用户管理systemd需经过root同意
+Group=用户组		#服务执行的用户组
+Environment=环境变量	#定义环境变量
+WorkingDirectory=目录路径	#指定执行命令的全局工作目录，默认值为根目录(/)
+ExecStartPre=启动服务之前执行的命令
+ExecStopPost=停止服务之后执行的命令
+ExecStart=启动当前服务的命令	#启动的命令必须是一直保持前台运行的进程，不能是后台执行或一次性执行完的进程
+ExecStart=启动当前服务的命令 -config=目录路径	#-config：指定执行命令的临时工作目录
+ExecReload=重启服务执行的命令
+ExecStop=停止服务执行的命令	#可以不设置，system会强制关闭进程，可通过KillMode参数设置
+Restart=on-failure		#在什么情况下重启	 	
+RestartSec=10		#重启间隔时间，默认值为0.1秒(s)
+KillMode=process		#关闭服务的方式
+RemainAfterExit=no		#该服务的启动命令正常退出时，是否继续保持服务(当启动命令为后台命令时，此参数应设为yes)
+#Restart默认值为no，always：除了手动停止(systemctl stop)其他任何情况下都重启，on-failure：非正常退出时重启，包括被信号终止和超时
+#KillMode默认值为control-group，当前控制组里的所有子进程都会被杀掉(包括主进程)，process：只杀主进程，none：没有进程会被杀掉，只执行服务的ExecStop参数中的命令
+#RemainAfterExit当该服务的所有进程全部退出之后， 是否依然将此服务视为活动(active)状态，默认值为no，开启为yes
+#如果不设置任何ExecStart指令，那么必须确保设置了RemainAfterExit=yes指令，并且至少设置一个ExecStop指令。同时缺少ExecStart与ExecStop的服务单元是非法的(也就是必须至少明确设置其中之一)
+#执行的命令必须是绝对路径(脚本或进程)，不能执行shell的内部命令，不能切换(cd)和创建(mkdir)目录
+#为了避免服务出现漏洞而导致黑客通过该服务获取到root权限，一般会创建一个独立的系统用户负责运行服务进程
+
+[Install]
+WantedBy=multi-user.target	#定义为开机启动项，还需手动开启自启
+
+最后还需要用户手动让systemd进程重新读取service启动脚本：
+systemctl daemon-reload
+服务类型说明(Type)：
+simple：默认值，执行ExecStart指定的命令，启动主进程
+forking：以fork(分支)方式从父进程创建子进程，创建后父进程会立即退出
+oneshot：一次性进程，Systemd 会等当前服务退出，再继续往下执行
+dbus：当前服务通过D-Bus启动
+notify：当前服务启动完毕，会通知Systemd进程，然后再继续往下执行
+idle：若有其他任务执行完毕，当前服务才会运行
+
+systemd-analyze命令用于查看服务启动过程和耗时：
+systemd-analyze		#查看系统开机时间
+systemd-analyze blame	#查看每个服务的启动耗时
+systemd-analyze critical-chain	#显示瀑布状的启动过程流，逆序
+systemd-cgls		#以树形结构列出正在运行的进程
+
+服务的启动日志默认保存在/var/log/message文件
+journalctl命令可以更加方便地查看和管理服务启动日志，配置文件为/etc/systemd/journald.conf
+journalctl		#查看所有服务启动日志
+选项：
+-n 行数		#查看日志末尾的指定行数，默认为10行
+-u 服务名		#查看指定服务的日志
+-f		#实时刷新最新日志
+-k		#查看内核启动日志
+--disk-usage	#查看日志已占用的空间
+--vacuum-size=1G		#设置日志最大占用空间
+--vacuum-time=1years	#设置日志最大保存时间
+
+详细资料：
+https://www.cnblogs.com/harmful-chan/p/15969091.html
+https://blog.csdn.net/skh2015java/article/details/94012643
+http://www.ruanyifeng.com/blog/2016/03/systemd-tutorial-commands.html
+http://ruanyifeng.com/blog/2016/03/systemd-tutorial-part-two.html
+https://www.cnblogs.com/goldd/articles/5756942.html
+https://www.jinbuguo.com/systemd/systemd.service.html
+https://www.jianshu.com/p/7fd8b6ea336e
