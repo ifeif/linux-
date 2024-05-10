@@ -1,0 +1,97 @@
+Linux网络配置: 
+主机名配置：
+hostname		#显示主机名
+hostname 主机名		#设置主机名，临时有效)
+hostnamectl set-hostname 主机名		#设置主机名，永久生效
+vim /etc/hostname	通过编辑配置文件来修改主机名，并且永久有效
+重新登陆用户使主机名修改生效
+
+网卡配置：
+使用ifconfig命令需要先安装：
+	yum install net-tools
+ifconfig 网卡名 IP地址 netmask 子网掩码 up
+ifconfig 网卡名 IP地址/子网掩码长度 up
+网卡配置文件目录 ：
+/etc/sysconfig/network-scripts 
+网卡配置文件信息：
+	设备类型：TYPE=Ethernet		#选填
+	网卡名称：NAME=eno16777736	#选填
+	设备名称：DEVICE=eno16777736	#必填
+	是否启动：ONBOOT=yes		#必填
+	地址分配模式：BOOTPROTO=dhcp	#必填
+ 	#如果网卡地址分配模式为static，则需要填写以下内容
+	IP地址：IPADDR=192.168.10.1	
+	子网掩码：NETMASK=255.255.255.0	#第二种方式(掩码长度)：PREFIX=24
+	网关地址：GATEWAY=192.168.10.254
+	DNS地址：DNS1=192.168.10.254
+重启网卡服务使配置生效
+
+systemctl restart network	#重启服务,也可以启动服务，拥有start的作用
+systemctl status network	#查询状态
+systemctl stop network	#停止服务
+systemctl enable 服务名	#开机启动
+systemctl disable 服务名	#关闭开启启动
+ifcfg-eth0是本地网卡(CentOS6)
+lo是回环网卡 
+en：表示以太网网卡
+wl：表示无线局域网网卡
+ww：表示无线广域网网卡
+service iptables stop关闭防火墙 
+netstat -antup	#a:查看所有网络连接状态，n:以数字的形式显示服务器地址(不通过域名解析显示主机名),p:查看进程信息
+netstat -nr	#r:查看路由表
+netstat -nl	#l:查看监听中的端口
+
+Linux配置默认网关: 
+route add default gw 网关地址 
+等效于route add -net 0.0.0.0 netmask 0.0.0.0 gw 网关地址 
+该条命令的作用是访问任何ip地址将会丢给网关 
+
+centos7命令变化: 
+ifcfg-ens33是本地网卡 
+setup命令改成nmtui命令 
+ifconfig命令改成ip address show
+设置网卡地址ip address add 192.168.1.1/24 dev eno16777736
+route add改成ip route add
+firewalld防火墙服务 
+网络服务启动改成systemctl start smb 
+开机启动改成systemctl enable(disable) smb 
+
+
+tar -c 123.tar输入这条命令屏幕乱码 
+123.tar是一个已归档(已压缩)的文件 
+不加f选项会把归档内容输出到终端 
+本地的dns访问配置文件:(临时有效) 
+/etc/resolv.conf 
+NetworkManager服务会在启动时自动同步网卡配置的DNS信息到主机DNS配置文件/etc/resolv.conf
+禁用自动同步网卡dns到resolv.conf文件,使resolv.conf文件永久生效:
+systemctl disable NetworkManager
+dhcp配置文件: 
+/etc/dhcp/dhcpd.conf 
+Apache(http)配置文件: 
+/etc/httpd/conf/httpd.conf 
+默认网站目录/var/www/html/ 
+DNS配置文件:(需关闭本地防火墙) 
+/etc/named.conf 
+区域主机目录/var/named/ 
+vsftp配置文件: 
+/etc/vsftpd/vsftpd.conf 
+匿名用户目录/var/ftp/pub 
+smb配置文件: 
+/etc/samba/smb.conf 
+配置Apache打开网页没有权限(Forbidden) 
+
+什么是selinux：
+类似win10自带的Windows Defender
+setenforce 0	#临时关闭 
+setenforce 1	#临时启动
+getenforce	#查看状态
+永久禁用selinux: 
+vi /etc/sysconfig/selinux 
+SELINUX=enforcing改为disabled重启生效
+
+测试系统网速：
+wget -qO- bench.sh | bash
+查看系统当前实时网速：
+sudo yum install -y nload
+sudo nload -m	#-m：只显示统计数据(推荐)，不显示流量图
+当显示的信息过多时，可用左右方向键来切换显示的网卡

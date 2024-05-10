@@ -1,0 +1,150 @@
+Linux磁盘管理命令:
+df -h	显示已挂载的文件系统磁盘使用情况，h:以人类易懂的方式显示文件大小（人性化）
+lsblk	列出块设备(分区)，list block
+lsblk -f	查看块设备(分区)文件系统类型
+
+fdisk工具用于在磁盘上创建MBR分区表，另外还有个parted工具可以创建GPT分区表。
+fdisk -l	列出可用的磁盘信息和分区信息
+fdisk /dev/sda	分区物理磁盘(MBR分区)，进入fdisk操作
+parted -l   查看linux分区文件系统类型
+parted /dev/sda      分区物理磁盘(GPT分区)，进入parted操作
+mkfs -t ext4 /dev/sdb1  在分区建立文件系统
+mkfs.ext4 /dev/sdb1  另一种方式，同上
+mkfs.xfs /dev/sdb1  格式化为xfs（centOS7新增文件系统格式）
+mount 设备 挂载点   将实际物理分区与目录对应，以后通过这个目录访问这个分区
+umount 设备或挂载点   卸载分区
+修改配置文件/etc/fstab来开启自动挂载，系统启动时自动挂载分区
+uuid：分区唯一编号(识别码)
+
+硬盘最多有四个分区:3个主分区加上1个扩展分区,扩展分区又可以分诺干个逻辑分区
+fdisk操作常用命令:
+n新建分区
+d删除分区
+p列出分区表
+t修改分区类型
+m或?显示帮助
+w保存退出
+q退出
+parted操作常用命令:
+print：打印分区信息
+mklabel gpt：修改分区表为gpt
+mkpart：创建分区
+rm：删除分区
+mkpart primary 0% 100%	#创建主分区，并且该分区占用磁盘100%的空间
+mkpart primary 1MB 1GB	#创建主分区，并且该分区占用磁盘1GB的空间
+q：退出(parted自动保存分区，不用手动保存)
+
+
+partprobe 刷新分区表，分区后执行，减少出错，建议刷新两次
+创建完分区不要忘记格式化
+
+
+LVM逻辑卷管理器(动态磁盘管理):
+抽象概念(可忽略)
+PE:物理单元，多个PE组成PV，LVM抽象的最小单元
+PV:物理卷，多个PV组成VG，由物理磁盘抽象成虚拟磁盘
+
+物理卷(Physical Volume,PV)：就是指硬盘分区，也可以是整个硬盘或已创建的软RAID，是LVM的基本存储设备。
+卷组(Volume Group,VG)：是由一个或多个物理卷所组成的存储池，在卷组上能创建一个或多个逻辑卷。
+逻辑卷(Logical Volume,LV)：类似于非LVM系统中的硬盘分区，它建立在卷组之上，是一个标准的块设备，在逻辑卷之上可以建立文件系统。
+
+VG:卷组，可理解为整合后的物理磁盘
+LV:逻辑卷，可理解为LVM划分之后的磁盘分区
+
+LVM在整合原来的磁盘(分区)的基础上再进行LV划分
+在LVM看来，所有的物理磁盘都可以归纳为可用空间
+
+LVM的优点：逻辑卷LV的空间大小能够在保持现有数据不变的情况下进行动态调整，提高了磁盘管理的灵活性。
+
+创建LVM分区有两种方法：
+
+第一种：
+直接在整块未分区的硬盘上进行LVM配置,例如pvcreate /dev/sdb
+推荐这种方法，比较简单
+
+第二种：
+先使用fdisk工具进行分区，在磁盘MBR分区上创建LVM分区(进行LVM配置)，例如pvcreate /dev/sdb1 /dev/sdb2
+进行LVM配置之前需要修改分区类型
+在使用fdisk的过程中输入p查看当前分区类型
+输入l列出所有分区类型
+可以看到LVM类型代码是8E
+输入t进行分区类型修改
+最后选择分区再输入8E修改
+
+
+创建:
+pvcreate /dev/sdc /dev/sdd	#把两块硬盘整合为pv。可以省略这一步，在创建vg时自动创建pv
+vgcreate vgname /dev/sdc /dev/sdd	#可以结合通配符/dev/sd[cd]
+lvcreate -L +100M -n lvname vgname
+mkfs -t ext4 /dev/vgname/lvname
+mount /dev/vgname/lvname /mnt
+查看:
+pvs,vgs,lvs 列出列表
+pvscan,vgscan,lvscan 重新扫描
+pvdisplay,vgdisplay,lvdisplay 显示详细信息
+扩展(动态调整，不需要卸载设备):
+vgextend vgname /dev/sde
+(可理解为扩大物理磁盘)
+lvextend -L +100M /dev/vgname/lvname
+注:加号不能忘，否则重置大小
+(可理解为扩大分区)
+resize2fs /dev/vgname/lvname
+(重新调整文件系统的大小)
+移除:
+vgremove vgname
+(移除vg卷组)
+pvremove /dev/sdd		移除了vg才能移除pv
+(移除pv物理卷）
+lvremove /dev/vgname/lvname	可直接移除vg而不用移除vg上的lv
+lvremove vgname
+(从卷组中移除lv逻辑卷)
+数据迁移：
+pvmove /dev/sdc /dev/sdd
+(pv数据迁移，从/dev/sdc移动到/dev/sdd，只能在同一个卷组内迁移)
+使用lvextend命令扩容只是对lvname的大小进行了扩展，而lvname之上的文件系统并没有进行扩展
+需要使用额外的命令刷新文件系统的大小
+resize2fs /dev/vgname/lvname(逻辑卷名称)	重新调整ext4文件系统的大小
+xfs_growfs 挂载点	重新调整centOS7里的xfs文件系统的大小
+lvextend -r -L +100M /dev/vgname/lv01	扩容lv的同时调整文件系统大小	r:刷新文件系统,持多种文件系统，推荐使用 
+L:按照字节分配空间
+l:指定逻辑卷LE的数量
+那么什么是LE：
+le是lv中最小的存储单元。le=pe，因为lv是基于vg的，vg是由多个pv构成，
+pv的储存单元是pe，lv的存储单元是le，所以它们相等。
+
+要点：
+1.创建完分区不要忘记格式化文件系统
+2.移除分区之前不要忘记卸载设备文件
+
+磁盘配额：
+软限制：达到限制时提示用户
+硬限制：达到限制时强制终止用户操作
+为了让文件系统支持配额，在挂载的时候需要添加-o选项 uquota针对用户进行配额,gquota针对组进行配额
+mount -o uquota,gquota 设备 挂载点	-o：改变挂载选项
+当要重新挂载设备并且不改变挂载目录时需添加-o remount参数
+quota工具对ext4文件系统进行配额管理
+xfs_quota工具对xfs文件系统进行配额管理
+-x 启动专家模式，可以进行更多复杂的配置，后面才能使用-c
+-c 以参数的形式添加配额命令
+xfs_quota -x -c 'limit bsoft=3m bhard=6m isoft=3 ihard=6 user' 挂载点
+#对user用户软限制3MB，硬限制6MB，文件数量软限制3个，硬限制6个
+limit：设置限制
+bsoft： 容量进行软限制
+bhard： 容量进行硬限制
+isoft： 文件数进行软限制
+ihard：文件数进行硬限制
+xfs_quota -x -c 'report' 挂载点		#查看配额信息
+
+dd if=/dev/zero of=/filename bs=1M count=10	#生成10M大小的文件
+if:输入文件源    bs:块大小    count:块数量    of:输出文件
+edquota -u 用户名	 修改用户配额
+
+
+硬链接：指向原始文件inode的指针，两者是同一个文件，删除源文件后硬链接无影响
+硬链接不能跨分区(文件系统)、不能对目录链接
+ln 原文件名 链接文件名
+软连接：类似windows的快捷方式
+ln -s 原文件名 链接文件名
+
+lvm参考资料：
+https://blog.csdn.net/Ora_G/article/details/107039827

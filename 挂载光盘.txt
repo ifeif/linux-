@@ -1,0 +1,31 @@
+vim /etc/fstab
+设备文件	挂载目录	设备类型	挂载选项	开机备份	开机自检
+/dev/sr0	/mnt	iso9660	loop,ro	0 	0
+mount -a	#依据/etc/fstab中定义的内容自动挂载
+
+sr0是光盘设备文件
+cdrom是sr0的软链接(快捷方式)
+
+mount -l			#列出已经挂载的设备
+mount -o 选项 设备 挂载点	#-o：改变挂载选项
+mount -o remount，rw /	#重新挂载根目录为可读写
+挂载选项：
+rw/ro：以读写/只读模式挂载该设备(文件系统)
+auto/noauto：自动/手动，mount -a命令执行时，是否自动挂载，只能/etc/fstab文件中添加此选项
+async/sync：异步/同步存储数据
+exec/noexec：执行/不执行，是否允许文件系统中执行二进制文件(可执行文件)
+suid/nosuid   具有/不具有SUID权限，设定文件系统是否具有SUID权限
+dev：允许文件系统上有字符或块设备
+user/nouser   允许/不允许普通用户挂载，设定文件系统是否允许普通用户挂载
+defaults：默认挂载选项，包含rw、suid、dev、exec、auto、nouser、async这七个选项
+
+usrquata：支持用户磁盘配额
+grpquata：支持组磁盘配额
+loop：重复挂载该设备(镜像文件)
+remount：重新挂载已经挂载上的文件系统，并且不改变挂载目录
+
+参考资料：
+https://www.cnblogs.com/zhanghaiyublog/p/3611507.html
+https://blog.csdn.net/twisun/article/details/5071633
+https://blog.csdn.net/weixin_40212653/article/details/120870236
+http://blog.itpub.net/70000724/viewspace-2774146/

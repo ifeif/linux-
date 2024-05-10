@@ -1,0 +1,12 @@
+当你移动或复制了虚拟机，虚拟机在启动时VMware会弹出提示窗。
+我已移动该虚拟机：VMware不会修改虚拟机的mac地址
+我已复制该虚拟机：为了避免与原虚拟机使用相同的mac地址，VMware将修改当前虚拟机硬件的mac地址为新生成的mac地址
+
+如果点击我已复制该虚拟机，在某些低版本的linux系统(CentOS6)，内核不会成功修改eth0的mac地址，而是添加一张eth1网卡，导致eth0网卡启动不起来。
+CentOS6将新增的网卡信息记录在/etc/udev/rules.d/70-persistent-net.rules文件里，此时需要手动修改该文件。
+vim /etc/udev/rules.d/70-persistent-net.rules
+删除eth0网卡的信息，修改eth1的网卡名为eth0
+CentOS6的网卡配置文件的mac地址必须要和网卡硬件的mac一致才能启动(CentOS7的网卡配置文件可以不用添加mac地址)
+vim /etc/sysconfig/network-scripts/ifcfg-eth0
+HWADDR=虚拟网卡的物理地址
+service network restart

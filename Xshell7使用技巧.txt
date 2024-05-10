@@ -1,0 +1,52 @@
+﻿登录：
+	ssh root@目标地址:端口号
+安装快捷文件传输插件lrzsz：
+	yum install -y lrzsz
+从服务器接收(received):
+	rz或者从win10拖动文件到窗口
+从服务器发送(send):
+	sz 文件名
+备注：lrzsz最大只能传输4G大小的文件，并且不能传输整个文件夹。
+注意：Xshell无法使用Ctrl+C和Ctrl+V和剪贴板是因为Xshell本身没有设置Ctrl+C和Ctrl+V快捷键，需要自己手动创建
+
+在xshell命令行中打开图形化程序:
+ssh支持传输图形界面，不需要linux安装桌面环境就能打开图形化程序
+1.Linux安装X11：
+sudo yum -y install xorg-x11-xauth	#Centos
+sudo apt install xorg		#Ubuntu
+2.开启X11转发(默认情况下不需要改)：
+vim /etc/ssh/sshd_config
+X11Forwarding yes		#默认为yes
+systemctl restart sshd	#重启sshd服务
+3.安装Xming：
+Xming6.9下载地址： https://sourceforge.net/projects/xming/，下载后打开在后台运行
+4.配置xshell客户端：
+文件-->默认会话属性-->SSH-->隧道-->勾选转发X11连接到-->选择X DISPLAY
+5.测试：
+sudo yum -y install xclock
+运行xclock
+备注：不生效请尝试重启(或重新进行ssh连接)，X11转发需要用到环回接口的IPv6地址，请开启环回接口的IPv6
+或者在/etc/ssh/sshd_config文件中添加一行AddressFamily inet(inet仅适用于ipv4，inet6仅适用于ipv6)，让ssh服务只使用IPv4地址。
+
+原理解释：
+Linux下执行一个GUI程序通常需要两个部分来协调完成，X server与X client。
+X server是专门负责显示用户界面的，它管理你的显示器，键盘以及鼠标，
+通常你看到的桌面系统即是由它在背后驱动的，X client则负责程序的逻辑，
+如果需要使用用户界面，则通过给X server发送请求来完成。通常情况下，
+X server与X client都运行在同一台机器上，例如我们在Ubuntu上运行任何GUI程序都是这样的。
+但因为X系统当初设计成是通过socket在X server与X client之间通信的，所以它们也可以运行在不同的机器上。
+X11 Forwarding就提供了一个方法，在远程机器上执行X client程序(如Eclipse)，但是在本地机器上显示(即运行X server)。
+
+举个例子，如果用户点击了鼠标左键，因为鼠标归 X server 管理，
+于是 X server 就捕捉到了鼠标点击这个动作，然后它将这个动作告诉 X client，
+因为 X client 负责程序逻辑，于是 X client 就根据程序预先设定的逻辑(例如画一个圆)，
+告诉 X server 说：“请在鼠标点击的位置，画一个圆”。
+最后，X server 就响应 X client 的请求，在鼠标点击的位置，绘制并显示出一个圆。
+
+参考资料：
+https://www.jianshu.com/p/24663f3491fa
+https://www.jianshu.com/p/1a296191a122
+https://wiki.centos.org/FAQ/CentOS7
+https://zhuanlan.zhihu.com/p/386337161
+https://blog.csdn.net/weixin_43515220/article/details/104176695
+https://blog.csdn.net/weixin_43582081/article/details/124212306
